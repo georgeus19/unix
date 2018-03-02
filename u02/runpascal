@@ -1,0 +1,5 @@
+
+#!/bin/sh runpascal
+fpc program.pas
+ls | ./program | grep '[0-9 ]' | head -n5
+ls | rm program program.o
