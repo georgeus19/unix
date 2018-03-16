@@ -2,8 +2,9 @@
 a=$1
 b=$2
 if [ $a = '--help' ] ; then echo '
-	-i : images only
-	-s : sound only' ;
+	-i : images only(.jpg,.png,.svg)
+	-------------------------------
+	-s : sound only(.wav,.mp3,.ogg)' ;
 else
 	if [ $a = '-i' ] ; then 
 	grep -o 'https\?://[a-z0-9./]*\.jpg' < $b
