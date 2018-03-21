@@ -2,9 +2,11 @@
 a=$1
 b=$2
 if [ $a = '--help' ] ; then echo '
-	-i : images only(.jpg,.png,.svg)
+ 	Getmedia vypise odkazy na obrazky/zvuky
 	-------------------------------
-	-s : sound only(.wav,.mp3,.ogg)' ;
+	-i : jen images(.jpg,.png,.svg)
+	-------------------------------
+	-s : jen sound(.wav,.mp3,.ogg)' ;
 else
 	if [ $a = '-i' ] ; then 
 	grep -o 'src=[^ ]*.jpg"' < $b | tr -d 'src="'
