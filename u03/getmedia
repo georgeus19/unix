@@ -9,9 +9,9 @@ if [ $a = '--help' ] ; then echo '
 	-s : jen zvuky(.wav,.mp3,.ogg)' ;
 else
 	if [ $a = '-i' ] ; then 
-	grep -o 'src=[^ ]*.jpg"' < $b | tr -d 'src="'
-	grep -o 'src=[^ ]*.png"' < $b | tr -d 'src="'
-	grep -o 'src=[^ ]*.svg"' < $b | tr -d 'src="'
+	grep -o 'src="[^ ]*.jpg"' < $b | tr -d 'src="'
+	grep -o 'src="[^ ]*.png"' < $b | tr -d 'src="'
+	grep -o 'src="[^ ]*.svg"' < $b | tr -d 'src="'
 
 	else
 	if [ $a = '-s' ] ; then 
