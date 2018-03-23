@@ -3,7 +3,7 @@ b=0
 c=0
 cut -d';' -f11 data5.csv | tr -d 'A-Za-z' | tr '.' '\t' | tr '[' '\t' | sort -r | cut -f1 | grep -o '^[0-9]*$' > data3
 while read a ; do
-	b=$(($b+a))
+	b=$(($b+$a))
 	c=$(($c+1))
 if [ $a -eq 119 ] ; then  vysledek=$(($b/$c)) ; rm data3 ; echo $vysledek ; exit  ; fi;
 done < "data3"
