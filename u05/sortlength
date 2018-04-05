@@ -4,9 +4,9 @@ touch data
 touch data1
 cp $1 data
 for i in `seq "$pocetradku"` ; do
-cut -f1 $1 | tail -n +$i | head -n1 | wc -c >> data1
+cut -f1 $1 | tail -n +$i | head -n1 | wc -m >> data1
 done
 paste data1 data > data3
 rm data1 data
-sort -n data3 | cut  -f1 --complement > countrycodessorted_en.csv
+sort -n data3 | cut  -f1 --complement 
 rm data3
