@@ -1,17 +1,21 @@
 #!/bin/bash
 declare -i counter=1
-	cat $1 | grep -e "^+" -e "^-" -e "^diff " > pom
+	cat $1 | grep -e "^+" -e "^-" -e "^diff -"> pom
 	cat $1 | grep "^diff" > nazvy
 csplit -s pom /'diff -'/ {*}
 cat nazvy | while read line ; do
-        nazev1=`echo $line | grep -o "/[^ ]*$" | tr '/' '-'`
+        nazev1=`echo $line | grep -o "[^ /]/[^ ]*$" | tr '/' '-'`
         nazev="$2/$nazev1.patch"
+
 	if [ $counter -gt 9 ] ; then
         	puvodni="xx$counter"
 	else 
 	puvodni="xx0$counter"
 	fi ;
-	mv -f "$puvodni" "$nazev"
+	sed '1d' "$puvodni" > "$nazev"
+	#mv -f aaa "$nazev"
 counter=$(($counter+1))
+rm $puvodni
 done
 rm pom nazvy xx00
+
