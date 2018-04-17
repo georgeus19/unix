@@ -1,0 +1,8 @@
+diff --git a/.gitignore b/.gitignore
+--- a/.gitignore
++++ b/.gitignore
++cmake-build-debug
++CMakeCache.txt
++CMakeFiles
++cmake_install.cmake
++.idea

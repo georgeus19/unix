@@ -1,0 +1,10 @@
+diff --git a/src/generator.h b/src/generator.h
+--- a/src/generator.h
++++ b/src/generator.h
+-#define randmax_type uint64_t
++	typedef uint64_t randmax_t;
++
+-		randmax_type i;
+-		r.gen (sizeof (randmax_type), (byte*) &i);
++		randmax_t i;
++		r.gen (sizeof (randmax_t), (byte*) &i);

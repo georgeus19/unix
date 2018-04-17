@@ -1,0 +1,10 @@
+diff --git a/src/symkey.h b/src/symkey.h
+--- a/src/symkey.h
++++ b/src/symkey.h
+-#include "generator.h"
++#include "prng.h"
++
++	bool load (const std::string&fn, const std::string&withlock,
++	           bool for_encryption, bool armor);
++	bool save (const std::string&fn, const std::string&withlock,
++	           bool armor, bool force_lock, prng&r);

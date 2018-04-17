@@ -1,0 +1,2522 @@
+diff --git a/.gitignore b/.gitignore
+index cb97670..32cd6bc 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -2,6 +2,10 @@ aclocal.m4
+ AUTHORS
+ autom4te.cache/
+ ccr
++cmake-build-debug
++CMakeCache.txt
++CMakeFiles
++cmake_install.cmake
+ codecrypt-*.tar.gz
+ compile
+ config.guess
+@@ -10,6 +14,7 @@ config.status
+ config.sub
+ configure
+ depcomp
++.idea
+ INSTALL
+ install-sh
+ libtool
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+new file mode 100644
+index 0000000..112491b
+--- /dev/null
++++ b/CMakeLists.txt
+@@ -0,0 +1,96 @@
++# Alternative way for building the project from git, viable for less-unixy
++# platforms.  Do _NOT_ use this for packaging; _DO_ use autotools instead.
++#
++# (c) 2018- tearsofphoenix <tearsofphoenix@icloud.com>
++
++cmake_minimum_required(VERSION 3.8)
++project(ccr)
++
++set(CMAKE_CXX_STANDARD 11)
++
++if (APPLE)
++    include_directories(/usr/local/opt/gmp/include /usr/local/opt/fftw/include)
++    link_directories(/usr/local/opt/gmp/lib /usr/local/opt/fftw/lib)
++    add_definitions(-DHAVE_READPASSPHRASE=1)
++
++    find_library(HAVE_CRYPTOPP cryptopp)
++    if(HAVE_CRYPTOPP)
++        add_definitions(-DHAVE_CRYPTOPP=1)
++        include_directories(/usr/local/opt/cryptopp/include)
++        link_directories(/usr/local/opt/cryptopp/lib)
++    else()
++        message(WARNING "install cryptopp by homebrew is better")
++    endif()
++
++elseif(UNIX)
++    include_directories(/usr/include)
++    link_directories(/usr/lib)
++
++    find_library(HAVE_BSDREADPASSPHRASE bsd)
++    if (HAVE_BSDREADPASSPHRASE)
++        add_definitions(-DHAVE_BSDREADPASSPHRASE=1)
++    else()
++        message(FATAL_ERROR "libbsd missing, you can install libbsd-dev package!")
++    endif()
++
++    find_library(HAVE_CRYPTOPP crypto++)
++    if(HAVE_CRYPTOPP)
++        add_definitions(-DHAVE_CRYPTOPP=1 -DCRYPTOPP_DIR_PLUS=1)
++    else()
++        message(WARNING "use crypto++ is better")
++    endif()
++
++endif (APPLE)
++
++add_definitions(-DPACKAGE_VERSION="1.8")
++
++add_executable(ccr
++        src/actions.cpp
++        src/algo_suite.cpp
++        src/algos_enc.cpp
++        src/algos_sig.cpp
++        src/base64.cpp
++        src/bvector.cpp
++        src/chacha.cpp
++        src/envelope.cpp
++        src/fft.cpp
++        src/fmtseq.cpp
++        src/generator.cpp
++        src/gf2m.cpp
++        src/hash.cpp
++        src/hashfile.cpp
++        src/iohelpers.cpp
++        src/ios.cpp
++        src/keyring.cpp
++        src/main.cpp
++        src/matrix.cpp
++        src/mce_qcmdpc.cpp
++        src/message.cpp
++        src/permutation.cpp
++        src/privfile.cpp
++        src/polynomial.cpp
++        src/sc.cpp
++        src/seclock.cpp
++        src/sencode.cpp
++        src/serialization.cpp
++        src/str_match.cpp
++        src/symkey.cpp
++        src/pwrng.cpp
++        src/xsynd.cpp)
++
++target_link_libraries(ccr fftw3 gmp)
++
++if (APPLE)
++elseif(UNIX)
++    if (HAVE_BSDREADPASSPHRASE)
++        target_link_libraries(ccr bsd)
++    endif()
++endif (APPLE)
++
++if (HAVE_CRYPTOPP)
++    if(CRYPTOPP_DIR_PLUS)
++        target_link_libraries(ccr crypto++)
++    else()
++        target_link_libraries(ccr cryptopp)
++    endif()
++endif ()
+diff --git a/CONTRIBUTING.md b/CONTRIBUTING.md
+new file mode 100644
+index 0000000..7e4c1a0
+--- /dev/null
++++ b/CONTRIBUTING.md
+@@ -0,0 +1,25 @@
++
++# How to contribute to Codecrypt?
++
++1. Fork and add a feature or a correction
++2. Check that the feature/correction is applicable (see below)
++3. Check that the code is in a good shape (also below)
++4. Send pull request
++5. Profit
++
++### Applicable features
++
++- All cryptography should be post-quantum (this mainly removes group-based
++  asymmetric primitives)
++- The program is strictly off-line, almost-non-interactive, commandline only
++- Algorithms that are not mainstream are better
++- Less code is always better
++- Less magic is always better
++
++### Good shape of the code
++
++- Compile with `-Wall`
++- Format the code using `astyle --style=linux -xl -xk -pdtLnU -M80`
++- Try to follow similar naming conventions as the rest of the project
++- Automated memory management is always better
++- Use a modern C++ (unlike what codecrypt started with)
+diff --git a/README.md b/README.md
+index ab473c4..b142a75 100644
+--- a/README.md
++++ b/README.md
+@@ -57,10 +57,10 @@ Stream ciphers used:
+ 
+ CRHFs used:
+ 
+-- Cubehash variants where selected for implementation ease, really clean
+-  design, quite good speed and flexibility of parameter choices. This is also
+-  the only hash possibility when Crypto++ library is not linked to codecrypt.
+-  KeyID's are CUBE256 hashes of serialized public key.
++- Cubehash variants were selected for implementation ease, really clean design,
++  quite good speed and flexibility of parameter choices. This is also the only
++  hash possibility when Crypto++ library is not linked to codecrypt.  KeyIDs
++  are CUBE256 hashes of corresponding serialized public keys.
+ - ripemd128 for small hashes
+ - tiger192 is used as an alternative for Cubehash for 192bit hashes
+ - There's always a variant with SHA-256, SHA-384 or SHA-512.
+@@ -135,6 +135,15 @@ margin. Let's play with random data!
+ 	#decrypt a large file
+ 	ccr -daS symkey.asc <big_data_encrypted.iso >big_data.iso
+ 
++	#password-protect all your private keys
++	ccr -L
++
++	#protect a symmetric key using another symmetric key
++	ccr -L -S symkey1 -w symkey2
++
++	#password-protect symkey2 with a custom cipher
++	ccr -L -S symkey2 -w @xsynd,cube512
++
+ ## Option reference
+ 
+ For completeness I add listing of all options here (also available from
+@@ -148,8 +157,8 @@ For completeness I add listing of all options here (also available from
+ 	 -T, --test     perform (probably nonexistent) testing/debugging stuff
+ 
+ 	Global options:
+-	 -R, --in      input file, default is stdin
+-	 -o, --out     output file, default is stdout
++	 -R, --in      set input file, default is stdin
++	 -o, --out     set output file, default is stdout
+ 	 -E, --err     the same for stderr
+ 	 -a, --armor   use ascii-armored I/O
+ 	 -y, --yes     assume that answer is `yes' everytime
+@@ -166,13 +175,13 @@ For completeness I add listing of all options here (also available from
+ 	 -C, --clearsign    work with cleartext signatures
+ 	 -b, --detach-sign  specify file with detached signature
+ 	 -S, --symmetric    enable symmetric mode of operation where encryption
+-	                    is done using symmetric cipher and signatures are
+-	                    hashes, and specify a filename of symmetric key or hashes
++			    is done using symmetric cipher and signatures are
++			    hashes, and specify a filename of symmetric key or hashes
+ 
+ 	Key management:
+ 	 -g, --gen-key        generate keys for specified algorithm
+ 	 -g help              list available cryptographic algorithms
+-	 -k, --list           list contents of keyring
++	 -k, --list           list the contents of keyring
+ 	 -K, --list-secret
+ 	 -i, --import         import keys
+ 	 -I, --import-secret
+@@ -182,12 +191,17 @@ For completeness I add listing of all options here (also available from
+ 	 -X, --delete-secret
+ 	 -m, --rename         rename matching keys
+ 	 -M, --rename-secret
++	 -L, --lock           lock secrets
++	 -U, --unlock         unlock secrets
+ 
+ 	Key management options:
+-	 -n, --no-action    on import, only show what would be imported
+-	 -N, --name         specify a new name for renaming or importing
+ 	 -F, --filter       only work with keys with matching names
+ 	 -f, --fingerprint  format full key IDs nicely for human eyes
++	 -N, --name         specify a new name for renaming or importing
++	 -n, --no-action    on import, only show what would be imported
++	 -w, --with-lock    specify the symmetric key for (un)locking the secrets
++	 -w @SPEC           ask for password and expand it to a symmetric key
++	                    of type SPEC for (un)locking the secret
+ 
+ 
+ ## Disclaimer
+diff --git a/autogen.sh b/autogen.sh
+index 271d2c0..2f7d9d5 100755
+--- a/autogen.sh
++++ b/autogen.sh
+@@ -28,7 +28,7 @@ echo "${NAME}_CPPFLAGS = -I\$(srcdir)/$i/ ${COMMON_CPPFLAGS}" >>$OUT
+ echo "${NAME}_CFLAGS = ${COMMON_CFLAGS}" >>$OUT
+ echo "${NAME}_CXXFLAGS = ${COMMON_CXXFLAGS}" >>$OUT
+ echo "${NAME}_LDFLAGS = ${COMMON_LDFLAGS} \$(CRYPTOPP_CFLAGS) " >>$OUT
+-echo "${NAME}_LDADD = -lgmp -lfftw3 -lm \$(CRYPTOPP_LIBS) ${COMMON_LDADD} " >>$OUT
++echo "${NAME}_LDADD = -lgmp -lfftw3 -lm \$(CRYPTOPP_LIBS) ${COMMON_LDADD} \$(EXTRA_LIBS) " >>$OUT
+ 
+ if [[ "$OSTYPE" == "darwin"* ]]; then
+   glibtoolize --force && aclocal && autoconf && automake --add-missing
+diff --git a/configure.ac b/configure.ac
+index 3c65d13..e2c1e5d 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -1,11 +1,11 @@
+ 
+ AC_PREREQ(2.6)
+-AC_INIT([codecrypt], [1.7.6])
++AC_INIT([codecrypt], [1.8])
+ AC_CONFIG_AUX_DIR(.) # because of libtoolize
+ AC_CONFIG_MACRO_DIR([m4])
+ 
+ AM_INIT_AUTOMAKE()
+-m4_ifdef([AM_SILENT_RULES],[AM_SILENT_RULES])
++m4_ifdef([AM_SILENT_RULES],[AM_SILENT_RULES([yes])])
+ 
+ CFLAGS="$CFLAGS"
+ CXXFLAGS="$CXXFLAGS"
+@@ -35,6 +35,8 @@ AC_ARG_WITH([cryptopp],
+ #and check crypto++
+ if test "$WITH_CRYPTOPP" = "yes"; then
+ 	
++	PKG_PROG_PKG_CONFIG([0.25])
++
+ 	PKG_CHECK_MODULES([CRYPTOPP],[libcrypto++])
+ 
+ 	#crypto++ headers are either in include/crypto++ or include/cryptopp,
+@@ -53,6 +55,22 @@ else
+ 	AC_DEFINE([HAVE_CRYPTOPP], [0])
+ fi
+ 
++#check for readpassphrase. If none is found, we use getpass (with a warning)
++AC_CHECK_HEADER([readpassphrase.h],
++	[READPASSPHRASE=native],
++	AC_CHECK_HEADER([bsd/readpassphrase.h],
++		[READPASSPHRASE=bsd], ))
++
++if test "$READPASSPHRASE" = "native"; then
++	AC_DEFINE([HAVE_READPASSPHRASE], [1])
++fi
++if test "$READPASSPHRASE" = "bsd"; then
++	AC_DEFINE([HAVE_BSDREADPASSPHRASE], [1])
++	AC_CHECK_LIB([bsd], [readpassphrase],
++		[LIBS="-lbsd $LIBS"], #is there a better version of this?
++		AC_MSG_ERROR([library for bsd/readpassphrase.h not found]))
++fi
++
+ #check for standard functions
+ AC_CHECK_FUNCS([memset mkdir], , AC_MSG_ERROR([Required function missing]))
+ 
+@@ -63,6 +81,7 @@ AC_CHECK_HEADERS([fcntl.h inttypes.h stddef.h stdlib.h string.h sys/file.h unist
+ AC_CHECK_HEADER_STDBOOL
+ AC_C_INLINE
+ AC_TYPE_SIZE_T
++AC_TYPE_SSIZE_T
+ AC_TYPE_UINT32_T
+ AC_TYPE_UINT64_T
+ AC_TYPE_UINT8_T
+diff --git a/man/ccr.1 b/man/ccr.1
+index e602022..a69f96d 100644
+--- a/man/ccr.1
++++ b/man/ccr.1
+@@ -1,4 +1,4 @@
+-.TH CCR 1 2016-01-12 "ccr" "Codecrypt"
++.TH CCR 1 2017-10-23 "ccr" "Codecrypt"
+ .SH NAME
+ .B ccr
+ \- The post-quantum cryptography encryption and signing tool
+@@ -48,7 +48,7 @@ message signer or details about why decryption or verification fails.
+ 
+ .TP
+ \fB\-a\fR, \fB\-\-armor\fR
+-Where expecting input or output of data in codecrypt communication format, use
++Where expecting input or output of data in Codecrypt communication format, use
+ ascii-armoring.
+ 
+ Codecrypt otherwise usually generates raw binary data, that are very hard to
+@@ -94,7 +94,8 @@ decrypt it.
+ 
+ .TP
+ \fB\-u\fR, \fB\-\-user\fR <\fIkeyspec\fR>
+-Specify a private key to use for signing the message.
++Specify a private key to use for signing the message. If this option is empty,
++it is defaulted from CCR_USER environment variable.
+ 
+ .TP
+ \fB\-C\fR, \fB\-\-cleartext\fR
+@@ -227,6 +228,12 @@ Rename matching public keys. Use "-N" to specify a new name.
+ \fB\-M\fR, \fB\-\-rename\-secret\fR <\fIkeyspec\fR>
+ Rename matching private keys.
+ 
++.TP
++\fB\-w\fR, \fB\-\-with-lock\fR <\fIfile\fR>
++When loading the secret part of the keyring, decrypt the file using the
++specified shared key. If that file looks encrypted and \fB-w\fR is not
++specified, asking for the password interactively (i.e. "-w @") will be assumed.
++
+ .SH FILES
+ 
+ Codecrypt stores user data in a directory specified by environment variable
+@@ -300,6 +307,40 @@ idealized case and very roughly) halves the bit security (although the attack
+ remains exponential).  Users who are aware of large quantum computers being
+ built are advised to use 2^192 or 2^256 bit security keys.
+ 
++.SH PASSWORD-DERIVED SYMMETRIC KEYS AND PASSWORD-PROTECTED SECRETS
++
++Symmetric keys can be specified using a filename, or expanded from a password
++(which is convenient e.g. for protecting private keys): If the filename for
++\fB-S\fR starts with "@", program will first check the rest of the filename to
++find a symmetric cipher algorithm specification, as in \fB-g\fR. If nothing is
++specified, it will check CCR_SYMMETRIC_ALGORITHM environment variable, and if
++that is still unspecified, it will default to "SYM,SHORTBLOCK". The reason for
++defaulting the short blocks is that the functionality focuses on tiny keys.
++
++After the symmetric algorithm is chosen, program will try to get the password
++from environment variable CCR_SYMMETRIC_PASSWORD. If that variable is not set,
++it will ask the user for the password interactively.
++
++The password will be expanded to internally form a symmetric key for the
++specified algorithm, which will in turn be used for the requested action.
++
++Symmetric and private keys may be encrypted by a password or a symmetric key.
++Parameter \fB-w\fR accepts the same arguments as \fB-S\fR, with the exception
++that the resulting loaded or internally generated symmetric key will be used to
++encrypt or decrypt symmetric and private keys when required:
++
++Actions \fB-L\fR and \fB-U\fR can be used to lock, resp. unlock private keys
++(specific keys to be modified can be selected using \fB--filter\fR) or
++symmetric keys (if used together with \fB-S\fR). Action \fB-g\fR can be
++modified by \fB-L\fR in the same way.
++
++The environment variables used for automatically-specifying the password in
++this case are separate from the previous ones: CCR_KEYRING_PASSWORD and
++CCR_KEYRING_ALGORITHM for locking/unlocking private keys, respectively
++CCR_SYMKEY_PASSWORD and CCR_SYMKEY_ALGORITHM for specifying symmetric key used
++to unlock other symmetric keys (even the ones that are themselves used for
++locking other keys).
++
+ .SH WARNINGS AND CAVEATS
+ 
+ .SS General advice
+@@ -310,13 +351,25 @@ can rename or delete more keys at once. Used cryptography is relatively new,
+ therefore be sure to verify current state of cryptanalysis before you put your
+ data at risk.
+ 
++.SS On-line use and side channels
++
++Codecrypt does not do much to prevent attacks that rely on side channels that
++are common on the internet. IF YOU DESPERATELY NEED TO PUT CODECRYPT TO E.G.
++AN ON-LINE SERVICE, MAKE SURE THAT ANY POTENTIAL ATTACKER CAN NOT ACCESS THE SIDE
++CHANNELS: Never execute Codecrypt directly from the server software. Sanitize
++BOTH the input and output of Codecrypt. Make any way to gather usable
++statistics about the running time of Codecrypt impossible. Make it hard for
++anyone to collect side-channel information, and, in particular, ensure that
++your application does not allow to repeatedly run Codecrypt in a way that makes
++it fail on invalid or damaged outputs, or produces any statistical
++information about timings and failures of the runs.
++
+ .SS Current state of cryptanalysis
+ 
+ In a fashion similar to aforementioned `new cryptography', the original
+-algebraic variant of quasi-dyadic McEliece that is still in codecrypt (MCEQD*
+-algorithms, kept for compatibility purposes) has been broken by an algebraic
+-attack. Security is greatly reduced. Use the QC-MDPC variant which dodges
+-similar attacks.
++algebraic variant of quasi-dyadic McEliece that was in Codecrypt has been
++broken by an algebraic attack. Security was greatly reduced. Use the QC-MDPC
++variant which dodges similar attacks.
+ 
+ .SS Large files
+ 
+@@ -369,6 +422,14 @@ Codecrypt.
+ 
+ If the seed source of your system can not be trusted, fix the system instead.
+ 
++.SH Password-derived symmetric keys
++
++Passwords are weak and, if times did not change and humanoids are still
++humanoids, you are prone to $5 wrench attacks.
++
++Combination of \fB-L\fR and \fB-S\fR options can be exploited to output a
++password-expanded key to a file. Doing that for any real purpose is a bad idea.
++
+ .SH Troubleshooting/FAQ
+ 
+ Q: I can't read/verify messages from versions 1.3.1 and older!
+@@ -450,11 +511,20 @@ ccr -eaS symkey.asc -R big_data.iso -o big_data_encrypted.iso
+ 
+ #decrypt a large file
+ ccr -daS symkey.asc <big_data_encrypted.iso >big_data.iso
++
++#password-protect all your private keys
++ccr -L
++
++#protect a symmetric key using another symmetric key
++ccr -L -S symkey1 -w symkey2
++
++#password-protect symkey2 with a custom cipher
++ccr -L -S symkey2 -w @xsynd,cube512
+ .fi
+ 
+ .SH DISCLAIMER
+ 
+-Used cryptography is relatively new. For this reason, codecrypt eats data. Use
++Used cryptography is relatively new. For this reason, Codecrypt eats data. Use
+ it with caution.
+ 
+ .SH AUTHORS
+diff --git a/src/actions.cpp b/src/actions.cpp
+index 49c015f..1cd439b 100644
+--- a/src/actions.cpp
++++ b/src/actions.cpp
+@@ -41,7 +41,6 @@
+ #define ENVELOPE_CLEARSIGN "clearsigned"
+ #define ENVELOPE_DETACHSIGN "detachsign"
+ #define ENVELOPE_HASHFILE "hashfile"
+-#define ENVELOPE_SYMKEY "symkey"
+ 
+ #define MSG_CLEARTEXT "MESSAGE-IN-CLEARTEXT"
+ #define MSG_DETACHED "MESSAGE-DETACHED"
+@@ -59,8 +58,10 @@ inline bool open_keyring (keyring&KR)
+ 
+ #define PREPARE_KEYRING if(!open_keyring(KR)) return 1
+ 
+-int action_gen_symkey (const std::string&algspec,
+-                       const std::string&symmetric, bool armor)
++static int action_gen_symkey (const std::string&algspec,
++                              const std::string&symmetric,
++                              const std::string&withlock,
++                              bool armor, bool force_lock)
+ {
+ 	symkey sk;
+ 	ccr_rng r;
+@@ -71,42 +72,13 @@ int action_gen_symkey (const std::string&algspec,
+ 		return 1;
+ 	}
+ 
+-	sencode*SK = sk.serialize();
+-	std::string data = SK->encode();
+-	sencode_destroy (SK);
+-
+-	std::ofstream sk_out;
+-	sk_out.open (symmetric == "-" ? "/dev/stdout" : symmetric.c_str(),
+-	             std::ios::out | std::ios::binary);
+-	if (!sk_out) {
+-		err ("error: can't open symkey file for writing");
+-		return 1;
+-	}
+-
+-	if (armor) {
+-		std::vector<std::string> parts;
+-		parts.resize (1);
+-		base64_encode (data, parts[0]);
+-		data = envelope_format (ENVELOPE_SYMKEY, parts, r);
+-	}
+-
+-	sk_out << data;
+-	if (!sk_out.good()) {
+-		err ("error: can't write to symkey file");
+-		return 1;
+-	}
+-
+-	sk_out.close();
+-	if (!sk_out.good()) {
+-		err ("error: couldn't close symkey file");
+-		return 1;
+-	}
++	if (!sk.save (symmetric, "", armor, force_lock, r)) return 1;
+ 
+ 	return 0;
+ }
+ 
+ typedef std::map<std::string, std::string> algspectable_t;
+-algspectable_t& algspectable()
++static algspectable_t& algspectable()
+ {
+ 	static algspectable_t table;
+ 	static bool init = false;
+@@ -119,11 +91,10 @@ algspectable_t& algspectable()
+ 		table["SIG-192"] = "FMTSEQ192C-CUBE384-CUBE192";
+ 		table["SIG-256"] = "FMTSEQ256C-CUBE512-CUBE256";
+ 
++		table["SYM"] = "CHACHA20,CUBE512";
+ #if HAVE_CRYPTOPP==1
+-		table["SYM"] = "CHACHA20,SHA256";
+ 		table["SYM-COMBINED"] = "CHACHA20,XSYND,ARCFOUR,CUBE512,SHA512";
+ #else
+-		table["SYM"] = "CHACHA20,CUBE512";
+ 		table["SYM-COMBINED"] = "CHACHA20,XSYND,ARCFOUR,CUBE512";
+ #endif
+ 
+@@ -134,7 +105,8 @@ algspectable_t& algspectable()
+ }
+ 
+ int action_gen_key (const std::string& p_algspec, const std::string&name,
+-                    const std::string&symmetric, bool armor,
++                    const std::string&symmetric, const std::string&withlock,
++                    bool armor, bool force_lock,
+                     keyring&KR, algorithm_suite&AS)
+ {
+ 	std::string algspec = to_unicase (p_algspec);
+@@ -186,7 +158,8 @@ int action_gen_key (const std::string& p_algspec, const std::string&name,
+ 
+ 	//handle symmetric operation
+ 	if (symmetric.length())
+-		return action_gen_symkey (algspec, symmetric, armor);
++		return action_gen_symkey (algspec, symmetric, withlock,
++		                          armor, force_lock);
+ 
+ 	algorithm*alg = NULL;
+ 	std::string algname;
+@@ -237,8 +210,10 @@ int action_gen_key (const std::string& p_algspec, const std::string&name,
+ 	 * that has a colliding KeyID with anyone else. This is highly
+ 	 * improbable, so apologize nicely in that case.
+ 	 */
+-	if (!KR.store_keypair (keyring::get_keyid (pub),
+-	                       name, algname, pub, priv)) {
++	keyring::keypair_entry*
++	kp = KR.store_keypair (keyring::get_keyid (pub),
++	                       name, algname, pub, priv);
++	if (!kp) {
+ 
+ 		err ("error: new key cannot be saved into the keyring.");
+ 		err ("notice: produced KeyID @" << keyring::get_keyid (pub)
+@@ -249,7 +224,12 @@ int action_gen_key (const std::string& p_algspec, const std::string&name,
+ 	}
+ 	//note that pub&priv sencode data will get destroyed along with keyring
+ 
+-	if (!KR.save()) {
++	if (force_lock && !kp->lock (withlock)) {
++		err ("error: locking the key failed");
++		return 1;
++	}
++
++	if (!KR.save (r)) {
+ 		err ("error: couldn't save keyring");
+ 		return 1;
+ 	}
+@@ -261,57 +241,11 @@ int action_gen_key (const std::string& p_algspec, const std::string&name,
+  * signatures/encryptions
+  */
+ 
+-int action_sym_encrypt (const std::string&symmetric, bool armor)
++static int action_sym_encrypt (const std::string&symmetric,
++                               const std::string&withlock, bool armor)
+ {
+-	//read the symmetric key first
+-	std::ifstream sk_in;
+-	sk_in.open (symmetric == "-" ? "/dev/stdin" : symmetric.c_str(),
+-	            std::ios::in | std::ios::binary);
+-
+-	if (!sk_in) {
+-		err ("error: can't open symkey file");
+-		return 1;
+-	}
+-
+-	std::string sk_data;
+-	if (!read_all_input (sk_data, sk_in)) {
+-		err ("error: can't read symkey");
+-		return 1;
+-	}
+-	sk_in.close();
+-
+-	if (armor) {
+-		std::vector<std::string> parts;
+-		std::string type;
+-		if (!envelope_read (sk_data, 0, type, parts)) {
+-			err ("error: no data envelope found");
+-			return 1;
+-		}
+-
+-		if (type != ENVELOPE_SYMKEY || parts.size() != 1) {
+-			err ("error: wrong envelope format");
+-			return 1;
+-		}
+-
+-		if (!base64_decode (parts[0], sk_data)) {
+-			err ("error: malformed data");
+-			return 1;
+-		}
+-	}
+-
+-	sencode*SK = sencode_decode (sk_data);
+-	if (!SK) {
+-		err ("error: could not parse input sencode");
+-		return 1;
+-	}
+-
+ 	symkey sk;
+-	if (!sk.unserialize (SK)) {
+-		err ("error: could not parse input structure");
+-		return 1;
+-	}
+-
+-	sencode_destroy (SK);
++	if (!sk.load (symmetric, withlock, true, armor)) return 1;
+ 
+ 	ccr_rng r;
+ 	if (!r.seed (256)) SEED_FAILED;
+@@ -326,10 +260,11 @@ int action_sym_encrypt (const std::string&symmetric, bool armor)
+ 
+ int action_encrypt (const std::string&recipient, bool armor,
+                     const std::string&symmetric,
++                    const std::string&withlock,
+                     keyring&KR, algorithm_suite&AS)
+ {
+ 	if (symmetric.length())
+-		return action_sym_encrypt (symmetric, armor);
++		return action_sym_encrypt (symmetric, withlock, armor);
+ 
+ 	//first, read plaintext
+ 	std::string data;
+@@ -403,56 +338,11 @@ int action_encrypt (const std::string&recipient, bool armor,
+ }
+ 
+ 
+-int action_sym_decrypt (const std::string&symmetric, bool armor)
++static int action_sym_decrypt (const std::string&symmetric,
++                               const std::string&withlock, bool armor)
+ {
+-	std::ifstream sk_in;
+-	sk_in.open (symmetric == "-" ? "/dev/stdin" : symmetric.c_str(),
+-	            std::ios::in | std::ios::binary);
+-
+-	if (!sk_in) {
+-		err ("error: can't open symkey file");
+-		return 1;
+-	}
+-
+-	std::string sk_data;
+-	if (!read_all_input (sk_data, sk_in)) {
+-		err ("error: can't read symkey");
+-		return 1;
+-	}
+-	sk_in.close();
+-
+-	if (armor) {
+-		std::vector<std::string> parts;
+-		std::string type;
+-		if (!envelope_read (sk_data, 0, type, parts)) {
+-			err ("error: no data envelope found");
+-			return 1;
+-		}
+-
+-		if (type != ENVELOPE_SYMKEY || parts.size() != 1) {
+-			err ("error: wrong envelope format");
+-			return 1;
+-		}
+-
+-		if (!base64_decode (parts[0], sk_data)) {
+-			err ("error: malformed data");
+-			return 1;
+-		}
+-	}
+-
+-	sencode*SK = sencode_decode (sk_data);
+-	if (!SK) {
+-		err ("error: could not parse input sencode");
+-		return 1;
+-	}
+-
+ 	symkey sk;
+-	if (!sk.unserialize (SK)) {
+-		err ("error: could not parse input structure");
+-		return 1;
+-	}
+-
+-	sencode_destroy (SK);
++	if (!sk.load (symmetric, withlock, false, armor)) return 1;
+ 
+ 	int ret = sk.decrypt (std::cin, std::cout);
+ 
+@@ -461,10 +351,11 @@ int action_sym_decrypt (const std::string&symmetric, bool armor)
+ }
+ 
+ int action_decrypt (bool armor, const std::string&symmetric,
++                    const std::string&withlock,
+                     keyring&KR, algorithm_suite&AS)
+ {
+ 	if (symmetric.length())
+-		return action_sym_decrypt (symmetric, armor);
++		return action_sym_decrypt (symmetric, withlock, armor);
+ 
+ 	std::string data;
+ 	read_all_input (data);
+@@ -516,6 +407,11 @@ int action_decrypt (bool armor, const std::string&symmetric,
+ 		return 2; //missing key flag
+ 	}
+ 
++	if (!kpe->decode_privkey (withlock)) {
++		err ("error: could not decrypt required private key");
++		return 1;
++	}
++
+ 	//and the algorithm
+ 	if ( (!AS.count (msg.alg_id))
+ 	     || (!AS[msg.alg_id]->provides_encryption())) {
+@@ -566,7 +462,7 @@ int action_decrypt (bool armor, const std::string&symmetric,
+ 	return 0;
+ }
+ 
+-int action_hash_sign (bool armor, const std::string&symmetric)
++static int action_hash_sign (bool armor, const std::string&symmetric)
+ {
+ 	hashfile hf;
+ 	if (!hf.create (std::cin)) {
+@@ -612,6 +508,7 @@ int action_hash_sign (bool armor, const std::string&symmetric)
+ 
+ int action_sign (const std::string&user, bool armor, const std::string&detach,
+                  bool clearsign, const std::string&symmetric,
++                 const std::string&withlock,
+                  keyring&KR, algorithm_suite&AS)
+ {
+ 	//symmetric processing has its own function
+@@ -678,6 +575,12 @@ int action_sign (const std::string&user, bool armor, const std::string&detach,
+ 		return 1;
+ 	}
+ 
++	//decode it for message.h
++	if (!u->decode_privkey (withlock)) {
++		err ("error: could not decrypt required private key");
++		return 1;
++	}
++
+ 	//signature production part
+ 	signed_msg msg;
+ 	ccr_rng r;
+@@ -748,7 +651,7 @@ int action_sign (const std::string&user, bool armor, const std::string&detach,
+ 	return 0;
+ }
+ 
+-int action_hash_verify (bool armor, const std::string&symmetric)
++static int action_hash_verify (bool armor, const std::string&symmetric)
+ {
+ 	// first, input the hashfile
+ 	std::ifstream hf_in;
+@@ -807,6 +710,7 @@ int action_hash_verify (bool armor, const std::string&symmetric)
+ 
+ int action_verify (bool armor, const std::string&detach,
+                    bool clearsign, bool yes, const std::string&symmetric,
++                   const std::string&withlock,
+                    keyring&KR, algorithm_suite&AS)
+ {
+ 	//symmetric processing has its own function
+@@ -1048,6 +952,7 @@ int action_verify (bool armor, const std::string&detach,
+  */
+ 
+ int action_sign_encrypt (const std::string&user, const std::string&recipient,
++                         const std::string&withlock,
+                          bool armor, keyring&KR, algorithm_suite&AS)
+ {
+ 	/*
+@@ -1119,6 +1024,12 @@ int action_sign_encrypt (const std::string&user, const std::string&recipient,
+ 		return 1;
+ 	}
+ 
++	//decode the signing key for message.h
++	if (!u->decode_privkey (withlock)) {
++		err ("error: could not decrypt required private key");
++		return 1;
++	}
++
+ 	//make a signature
+ 	signed_msg smsg;
+ 	ccr_rng r;
+@@ -1161,6 +1072,7 @@ int action_sign_encrypt (const std::string&user, const std::string&recipient,
+ 
+ 
+ int action_decrypt_verify (bool armor, bool yes,
++                           const std::string&withlock,
+                            keyring&KR, algorithm_suite&AS)
+ {
+ 	std::string data;
+@@ -1213,6 +1125,11 @@ int action_decrypt_verify (bool armor, bool yes,
+ 		return 2; //missing key flag
+ 	}
+ 
++	if (!kpe->decode_privkey (withlock)) {
++		err ("error: could not decrypt required private key");
++		return 1;
++	}
++
+ 	if ( (!AS.count (emsg.alg_id))
+ 	     || (!AS[emsg.alg_id]->provides_encryption())) {
+ 		err ("error: decryption algorithm unsupported");
+@@ -1326,7 +1243,7 @@ static void output_key (bool fp,
+ {
+ 	if (!fp)
+ 		out (ident << '\t' << escape_output (alg) << '\t'
+-		     << '@' << keyid.substr (0, 22) << "...\t"
++		     << '@' << keyid.substr (0, 10) << "...\t"
+ 		     << escape_output (name));
+ 	else {
+ 		out (longid << " with algorithm " << escape_output (alg)
+@@ -1471,7 +1388,9 @@ int action_import (bool armor, bool no_action, bool yes, bool fp,
+ 		}
+ 	}
+ 
+-	if (!KR.save()) {
++	ccr_rng r;
++	if (!r.seed (256)) SEED_FAILED;
++	if (!KR.save (r)) {
+ 		err ("error: couldn't save keyring");
+ 		return 1;
+ 	}
+@@ -1562,7 +1481,9 @@ int action_delete (bool yes, const std::string & filter, keyring & KR)
+ 	     i = todel.begin(), e = todel.end(); i != e; ++i)
+ 		KR.remove_pubkey (*i);
+ 
+-	if (!KR.save()) {
++	ccr_rng r;
++	if (!r.seed (256)) SEED_FAILED;
++	if (!KR.save (r)) {
+ 		err ("error: couldn't save keyring");
+ 		return 1;
+ 	}
+@@ -1609,7 +1530,9 @@ int action_rename (bool yes,
+ 			i->second.name = name;
+ 	}
+ 
+-	if (!KR.save()) {
++	ccr_rng r;
++	if (!r.seed (256)) SEED_FAILED;
++	if (!KR.save (r)) {
+ 		err ("error: couldn't save keyring");
+ 		return 1;
+ 	}
+@@ -1727,11 +1650,13 @@ int action_import_sec (bool armor, bool no_action, bool yes, bool fp,
+ 			                  name.length() ?
+ 			                  name : i->second.pub.name,
+ 			                  i->second.pub.alg,
+-			                  i->second.pub.key, i->second.privkey);
++			                  i->second.pub.key, i->second.privkey_raw);
+ 		}
+ 	}
+ 
+-	if (!KR.save()) {
++	ccr_rng r;
++	if (!r.seed (256)) SEED_FAILED;
++	if (!KR.save (r)) {
+ 		err ("error: couldn't save keyring");
+ 		return 1;
+ 	}
+@@ -1769,7 +1694,9 @@ int action_export_sec (bool armor, bool yes,
+ 		if (!okay) return 0;
+ 	}
+ 
+-	sencode*S = keyring::serialize_keypairs (s);
++	ccr_rng r;
++	if (!r.seed (256)) SEED_FAILED;
++	sencode*S = keyring::serialize_keypairs (s, r);
+ 	if (!S) return 1; //weird.
+ 	std::string data = S->encode();
+ 	sencode_destroy (S);
+@@ -1778,8 +1705,6 @@ int action_export_sec (bool armor, bool yes,
+ 		std::vector<std::string> parts;
+ 		parts.resize (1);
+ 		base64_encode (data, parts[0]);
+-		ccr_rng r;
+-		if (!r.seed (256)) SEED_FAILED;
+ 		data = envelope_format (ENVELOPE_SECRETS, parts, r);
+ 	}
+ 
+@@ -1819,7 +1744,9 @@ int action_delete_sec (bool yes, const std::string & filter, keyring & KR)
+ 	     i = todel.begin(), e = todel.end(); i != e; ++i)
+ 		KR.remove_keypair (*i);
+ 
+-	if (!KR.save()) {
++	ccr_rng r;
++	if (!r.seed (256)) SEED_FAILED;
++	if (!KR.save (r)) {
+ 		err ("error: couldn't save keyring");
+ 		return 1;
+ 	}
+@@ -1866,7 +1793,135 @@ int action_rename_sec (bool yes,
+ 			i->second.pub.name = name;
+ 	}
+ 
+-	if (!KR.save()) {
++	ccr_rng r;
++	if (!r.seed (256)) SEED_FAILED;
++	if (!KR.save (r)) {
++		err ("error: couldn't save keyring");
++		return 1;
++	}
++	return 0;
++}
++
++/*
++ * locking/unlocking
++ */
++
++static int action_lock_symkey (const std::string&symmetric,
++                               const std::string&withlock,
++                               bool armor)
++{
++	symkey sk;
++	if (!sk.load (symmetric, "", true, armor)) return 1;
++	ccr_rng r;
++	if (!r.seed (256)) SEED_FAILED;
++	if (!sk.save (symmetric, withlock, armor, true, r)) return 1;
++	return 0;
++}
++
++int action_lock_sec (bool yes,
++                     const std::string&filter,
++                     const std::string&symmetric,
++                     const std::string&withlock,
++                     bool armor,
++                     keyring&KR)
++{
++	if (!symmetric.empty())
++		return action_lock_symkey (symmetric, withlock, armor);
++
++	PREPARE_KEYRING;
++
++	int kc = 0;
++	for (keyring::keypair_storage::iterator
++	     i = KR.pairs.begin(), e = KR.pairs.end();
++	     i != e; ++i) {
++		if (keyspec_matches (filter, i->second.pub.name, i->first))
++			++kc;
++	}
++	if (!kc) {
++		err ("error: no such key");
++		return 0;
++	}
++	if (!yes) {
++		bool okay = false;
++		ask_for_yes (okay, "This will protect " << kc
++		             << " secrets from your keyring. Continue?");
++		if (!okay) return 0;
++	}
++
++	for (keyring::keypair_storage::iterator
++	     i = KR.pairs.begin(), e = KR.pairs.end();
++	     i != e; ++i) {
++		if (keyspec_matches (filter, i->second.pub.name, i->first))
++			if (!i->second.lock (withlock)) {
++				err ("error: key locking failed");
++				return false;
++			}
++	}
++
++	ccr_rng r;
++	if (!r.seed (256)) SEED_FAILED;
++	if (!KR.save (r)) {
++		err ("error: couldn't save keyring");
++		return 1;
++	}
++	return 0;
++}
++
++static int action_unlock_symkey (const std::string&symmetric,
++                                 const std::string&withlock,
++                                 bool armor)
++{
++	symkey sk;
++	if (!sk.load (symmetric, withlock, false, armor)) return 1;
++	ccr_rng r;
++	if (!r.seed (256)) SEED_FAILED;
++	if (!sk.save (symmetric, "", armor, false, r)) return 1;
++	return 0;
++}
++
++int action_unlock_sec (bool yes,
++                       const std::string&filter,
++                       const std::string&symmetric,
++                       const std::string&withlock,
++                       bool armor,
++                       keyring&KR)
++{
++	if (!symmetric.empty())
++		return action_unlock_symkey (symmetric, withlock, armor);
++
++	PREPARE_KEYRING;
++
++	int kc = 0;
++	for (keyring::keypair_storage::iterator
++	     i = KR.pairs.begin(), e = KR.pairs.end();
++	     i != e; ++i) {
++		if (keyspec_matches (filter, i->second.pub.name, i->first))
++			++kc;
++	}
++	if (!kc) {
++		err ("error: no such key");
++		return 0;
++	}
++	if (!yes) {
++		bool okay = false;
++		ask_for_yes (okay, "This will remove protection from " << kc
++		             << " secrets from your keyring. Continue?");
++		if (!okay) return 0;
++	}
++
++	for (keyring::keypair_storage::iterator
++	     i = KR.pairs.begin(), e = KR.pairs.end();
++	     i != e; ++i) {
++		if (keyspec_matches (filter, i->second.pub.name, i->first))
++			if (!i->second.unlock (withlock)) {
++				err ("error: key unlocking failed");
++				return false;
++			}
++	}
++
++	ccr_rng r;
++	if (!r.seed (256)) SEED_FAILED;
++	if (!KR.save (r)) {
+ 		err ("error: couldn't save keyring");
+ 		return 1;
+ 	}
+diff --git a/src/actions.h b/src/actions.h
+index 76d8512..4afdbed 100644
+--- a/src/actions.h
++++ b/src/actions.h
+@@ -29,7 +29,8 @@
+ #include "algorithm.h"
+ 
+ int action_gen_key (const std::string& algspec, const std::string&name,
+-                    const std::string&symmetric, bool armor,
++                    const std::string&symmetric, const std::string&withlock,
++                    bool armor, bool force_lock,
+                     keyring&, algorithm_suite&);
+ 
+ /*
+@@ -37,24 +38,25 @@ int action_gen_key (const std::string& algspec, const std::string&name,
+  */
+ 
+ int action_encrypt (const std::string&recipient, bool armor,
+-                    const std::string&symmetric,
++                    const std::string&symmetric, const std::string&withlock,
+                     keyring&, algorithm_suite&);
+ 
+ int action_decrypt (bool armor, const std::string&symmetric,
+-                    keyring&, algorithm_suite&);
++                    const std::string&withlock, keyring&, algorithm_suite&);
+ 
+ int action_sign (const std::string&user, bool armor, const std::string&detach,
+                  bool clearsign, const std::string&symmetric,
+-                 keyring&, algorithm_suite&);
++                 const std::string&withlock, keyring&, algorithm_suite&);
+ 
+ int action_verify (bool armor, const std::string&detach,
+                    bool clearsign, bool yes, const std::string&symmetric,
+-                   keyring&, algorithm_suite&);
++                   const std::string&withlock, keyring&, algorithm_suite&);
+ 
+ int action_sign_encrypt (const std::string&user, const std::string&recipient,
+-                         bool armor, keyring&, algorithm_suite&);
++                         const std::string&withlock, bool armor,
++                         keyring&, algorithm_suite&);
+ 
+-int action_decrypt_verify (bool armor, bool yes,
++int action_decrypt_verify (bool armor, bool yes, const std::string&withlock,
+                            keyring&, algorithm_suite&);
+ 
+ /*
+@@ -96,5 +98,18 @@ int action_rename_sec (bool yes,
+                        const std::string&filter, const std::string&name,
+                        keyring&);
+ 
++int action_lock_sec (bool yes,
++                     const std::string&filter,
++                     const std::string&symmetric,
++                     const std::string&withlock,
++                     bool armor,
++                     keyring&);
++
++int action_unlock_sec (bool yes,
++                       const std::string&filter,
++                       const std::string&symmetric,
++                       const std::string&withlock,
++                       bool armor,
++                       keyring&);
+ 
+ #endif
+diff --git a/src/arcfour.h b/src/arcfour.h
+index b17641e..5d42a4d 100644
+--- a/src/arcfour.h
++++ b/src/arcfour.h
+@@ -37,7 +37,7 @@ public:
+ 		I = J = 0;
+ 		S.resize (Ssize);
+ 		mask = ~ (inttype) 0;
+-		if ( (inttype) (1 << bits)) mask %= 1 << bits;
++		if ( (inttype) (1 << bits) != 0) mask %= 1 << bits;
+ 		for (size_t i = 0; i < Ssize; ++i) S[i] = i;
+ 	}
+ 
+@@ -45,7 +45,31 @@ public:
+ 		init();
+ 	}
+ 
+-	void load_key (const inttype*begin, const inttype*end) {
++	//ugly byte padding with zeroes for streamcipher compatibility
++	void load_key (const byte*begin, const byte*end) {
++		inttype j, t;
++		size_t i;
++		const byte *keypos;
++
++		//eat whole key iteratively, even if longer than permutation
++		for (; begin < end; begin += mask + 1) {
++			j = 0;
++			for (i = 0, keypos = begin;
++			     i <= mask;
++			     ++i, ++keypos) {
++				if (keypos >= end) keypos = begin; //rotate
++				j = (j + S[i] + (*keypos)) & mask;
++				t = S[j];
++				S[j] = S[i];
++				S[i] = t;
++			}
++		}
++
++		discard (disc_bytes);
++	}
++
++	//this works on wide keys
++	void load_wkey (const inttype*begin, const inttype*end) {
+ 		inttype j, t;
+ 		size_t i;
+ 		const inttype *keypos;
+@@ -67,7 +91,11 @@ public:
+ 		discard (disc_bytes);
+ 	}
+ 
+-	inttype gen() {
++	inline byte gen() {
++		return genw();
++	}
++
++	inttype genw() {
+ 		I = (I + 1) & mask;
+ 		J = (J + S[I]) & mask;
+ 
+@@ -79,13 +107,20 @@ public:
+ 		return S[ (S[I] + S[J]) & mask];
+ 	}
+ 
+-	void gen (size_t n, inttype*out) {
++	void gen (size_t n, byte*out) {
+ 		if (out)
+ 			for (size_t i = 0; i < n; ++i) out[i] = gen();
+ 		else
+ 			for (size_t i = 0; i < n; ++i) gen();
+ 	}
+ 
++	void genw (size_t n, inttype*out) {
++		if (out)
++			for (size_t i = 0; i < n; ++i) out[i] = genw();
++		else
++			for (size_t i = 0; i < n; ++i) genw();
++	}
++
+ 	void gen (size_t n, std::vector<inttype>&out) {
+ 		out.resize (n);
+ 		gen (n, & (out[0]));
+diff --git a/src/generator.h b/src/generator.h
+index 27c7c33..d45c921 100644
+--- a/src/generator.h
++++ b/src/generator.h
+@@ -25,11 +25,12 @@
+ #include "prng.h"
+ 
+ #include <stdint.h>
+-#define randmax_type uint64_t
+ 
+ class ccr_rng : public prng
+ {
+ public:
++	typedef uint64_t randmax_t;
++
+ 	chacha20 r;
+ 
+ 	ccr_rng() {
+@@ -43,8 +44,8 @@ public:
+ 	bool seed (uint bits, bool quick = true);
+ 
+ 	uint random (uint n) {
+-		randmax_type i;
+-		r.gen (sizeof (randmax_type), (byte*) &i);
++		randmax_t i;
++		r.gen (sizeof (randmax_t), (byte*) &i);
+ 		return i % n;
+ 	}
+ };
+diff --git a/src/keyring.cpp b/src/keyring.cpp
+index 5047fdc..de0d30c 100644
+--- a/src/keyring.cpp
++++ b/src/keyring.cpp
+@@ -104,7 +104,8 @@ void keyring::clear_keypairs (keypair_storage&pairs)
+ 	for (std::map<std::string, keypair_entry>::iterator
+ 	     i = pairs.begin(), e = pairs.end(); i != e; ++i) {
+ 		sencode_destroy (i->second.pub.key);
+-		sencode_destroy (i->second.privkey);
++		if (i->second.privkey)
++			sencode_destroy (i->second.privkey);
+ 	}
+ 	pairs.clear();
+ }
+@@ -149,19 +150,13 @@ bool keyring::parse_keypairs (sencode*keypairs, keypair_storage&pairs)
+ 		if (! (ident && alg && privkey && pubkey)) goto failure;
+ 
+ 		std::string keyid = get_keyid (pubkey->b);
+-		sencode *priv, *pub;
+-
+-		priv = sencode_decode (privkey->b);
+-		if (!priv) goto failure;
++		sencode *pub;
+ 
+ 		pub = sencode_decode (pubkey->b);
+-		if (!pub) {
+-			sencode_destroy (priv);
+-			goto failure;
+-		}
++		if (!pub) goto failure;
+ 
+ 		pairs[keyid] = keypair_entry (keyid, ident->b, alg->b,
+-		                              pub, priv);
++		                              pub, privkey->b);
+ 	}
+ 
+ 	return true;
+@@ -170,8 +165,12 @@ failure:
+ 	return false;
+ }
+ 
+-sencode* keyring::serialize_keypairs (const keypair_storage&pairs)
++sencode* keyring::serialize_keypairs (keypair_storage&pairs, prng&rng)
+ {
++	for (std::map<std::string, keypair_entry>::iterator
++	     i = pairs.begin(), e = pairs.end(); i != e; ++i)
++		if (!i->second.fix_dirty (rng)) return NULL;
++
+ 	sencode_list*L = new sencode_list();
+ 	L->items.push_back (new sencode_bytes (KEYPAIRS_ID));
+ 
+@@ -182,7 +181,7 @@ sencode* keyring::serialize_keypairs (const keypair_storage&pairs)
+ 		a->items.resize (4);
+ 		a->items[0] = new sencode_bytes (i->second.pub.name);
+ 		a->items[1] = new sencode_bytes (i->second.pub.alg);
+-		a->items[2] = new sencode_bytes (i->second.privkey->encode());
++		a->items[2] = new sencode_bytes (i->second.privkey_raw);
+ 		a->items[3] = new sencode_bytes (i->second.pub.key->encode());
+ 		L->items.push_back (a);
+ 	}
+@@ -284,6 +283,8 @@ static std::string get_user_dir()
+ 	return "." CCR_CONFDIR; //fallback for absolutely desolate systems
+ }
+ 
++#include "privfile.h"
++#include <fstream>
+ #include <sys/stat.h>
+ #include <sys/types.h>
+ #include <sys/file.h>
+@@ -291,8 +292,6 @@ static std::string get_user_dir()
+ #include <unistd.h>
+ #include <errno.h>
+ 
+-#include <fstream>
+-
+ /*
+  * prepares the user directory with empty files and similar stuff.
+  *
+@@ -303,33 +302,12 @@ static std::string get_user_dir()
+ static bool ensure_empty_sencode_file (const std::string&fn,
+                                        const std::string&ident)
+ {
+-	struct stat st;
+-	if (stat (fn.c_str(), &st)) {
+-		if (errno != ENOENT)
+-			return false;
+-
+-		//if it simply doesn't exist, create it
+-		sencode_list l;
+-		sencode_bytes b (ident);
+-		l.items.push_back (&b);
+-		std::string emptyfile = l.encode();
+-
+-		int fd;
+-		fd = creat (fn.c_str(), S_IRUSR | S_IWUSR);
+-		if (fd < 0) return false;
+-		ssize_t res = write (fd, emptyfile.c_str(),
+-		                     emptyfile.length());
+-		if (close (fd)) return false;
+-		if ( (size_t) res != emptyfile.length()) return false;
++	sencode_list l;
++	sencode_bytes b (ident);
++	l.items.push_back (&b);
++	std::string emptyfile = l.encode();
+ 
+-	} else {
+-		if (!S_ISREG (st.st_mode))
+-			return false;
+-	}
+-
+-	if (access (fn.c_str(), R_OK | W_OK)) return false;
+-
+-	return true;
++	return put_private_file (fn, emptyfile, true);
+ }
+ 
+ static bool prepare_user_dir (const std::string&dir)
+@@ -443,7 +421,7 @@ static void ignore_term_signals (bool ignore)
+ }
+ #endif
+ 
+-bool keyring::save()
++bool keyring::save (prng&rng)
+ {
+ 	std::string dir, fn, bfn;
+ 	sencode*S;
+@@ -466,7 +444,9 @@ bool keyring::save()
+ 	/*
+ 	 * keypairs
+ 	 */
+-	S = serialize_keypairs (pairs);
++	S = serialize_keypairs (pairs, rng);
++	if (!S) return false;
++
+ 	fn = dir + SECRETS_FILENAME;
+ 	bfn = fn + BAK_SUFFIX;
+ 	res = file_put_sencode_with_backup (fn, S, bfn, backup_pairs);
+@@ -559,3 +539,82 @@ bool keyring::close()
+ 
+ 	return true;
+ }
++
++/*
++ * keypair_entry loads the privkeys lazily so that it's not necessary to have
++ * all the secrets all the time
++ */
++
++#include "seclock.h"
++#include "iohelpers.h"
++
++bool keyring::keypair_entry::lock (const std::string&withlock)
++{
++	//withlock here is useful for just re-encrypting,
++	//possibly with different password
++	if (!decode_privkey (withlock)) return false;
++	err ("notice: locking key @" + pub.keyid);
++	if (!load_lock_secret (sk, withlock,
++	                       "protecting key `"
++	                       + escape_output (pub.name)
++	                       + "'",
++	                       "KEYRING", true))
++		return false;
++
++	dirty = true;
++	locked = true;
++	return true;
++}
++
++bool keyring::keypair_entry::unlock (const std::string&withlock)
++{
++	if (!decode_privkey (withlock)) return false;
++	if (locked) {
++		locked = false;
++		dirty = true;
++	}
++	return true;
++}
++
++bool keyring::keypair_entry::decode_privkey (const std::string&withlock)
++{
++	if (privkey) return true; //already done
++	std::string encoded;
++	if (looks_like_locked_secret (privkey_raw)) {
++		err ("notice: unlocking key @" + pub.keyid);
++		if (!unlock_secret_sk (privkey_raw, encoded,
++		                       withlock,
++		                       "loading key `"
++		                       + escape_output (pub.name)
++		                       + "'",
++		                       "KEYRING", sk))
++			return false;
++		locked = true;
++	} else {
++		encoded = privkey_raw;
++		locked = false;
++	}
++
++	privkey = sencode_decode (encoded);
++	if (!privkey)
++		return false;
++
++	dirty = false;
++	return true;
++}
++
++#include <sstream>
++
++bool keyring::keypair_entry::fix_dirty (prng&rng)
++{
++	if (!privkey || !dirty) return true; //nothing to do!
++	if (locked) {
++		std::string encoded = privkey->encode();
++		if (!lock_secret_sk (encoded, privkey_raw, sk, rng))
++			return false;
++	} else {
++		privkey_raw = privkey->encode();
++	}
++	dirty = false;
++	return true;
++}
+diff --git a/src/keyring.h b/src/keyring.h
+index 18dea91..df7a6ef 100644
+--- a/src/keyring.h
++++ b/src/keyring.h
+@@ -25,6 +25,7 @@
+ #include <map>
+ 
+ #include "sencode.h"
++#include "symkey.h"
+ 
+ class keyring
+ {
+@@ -50,10 +51,22 @@ public:
+ 
+ 	struct keypair_entry {
+ 		pubkey_entry pub;
++
+ 		sencode *privkey;
++		bool locked; //store encrypted
++		symkey sk;
++		bool dirty; //privkey_raw needs to be updated
++
++		std::string privkey_raw;
++
++		bool decode_privkey (const std::string&withlock);
++		bool lock (const std::string&withlock);
++		bool unlock (const std::string&withlock);
++		bool fix_dirty (prng&rng);
+ 
+ 		keypair_entry() {
+ 			privkey = NULL;
++			dirty = false;
+ 		}
+ 
+ 		keypair_entry (const std::string&KID,
+@@ -61,7 +74,22 @@ public:
+ 		               const std::string& A,
+ 		               sencode*PubK,
+ 		               sencode*PrivK)
+-			: pub (KID, N, A, PubK), privkey (PrivK) {}
++			: pub (KID, N, A, PubK),
++			  privkey (PrivK),
++			  locked (false),
++			  dirty (true)
++		{}
++
++		keypair_entry (const std::string&KID,
++		               const std::string& N,
++		               const std::string& A,
++		               sencode*PubK,
++		               const std::string&PrivK_raw)
++			: pub (KID, N, A, PubK),
++			  privkey (NULL),
++			  dirty (false),
++			  privkey_raw (PrivK_raw)
++		{}
+ 	};
+ 
+ 	typedef std::map<std::string, pubkey_entry> pubkey_storage;
+@@ -84,7 +112,7 @@ public:
+ 
+ 	bool open();
+ 	bool close();
+-	bool save();
++	bool save (prng&rng);
+ 
+ 	static std::string get_keyid (const std::string& pubkey);
+ 
+@@ -96,7 +124,7 @@ public:
+ 	static void clear_pubkeys (pubkey_storage&);
+ 
+ 	static bool parse_keypairs (sencode*, keypair_storage&);
+-	static sencode* serialize_keypairs (const keypair_storage&);
++	static sencode* serialize_keypairs (keypair_storage&, prng&rng);
+ 	static bool parse_pubkeys (sencode*, pubkey_storage&);
+ 	static sencode* serialize_pubkeys (const pubkey_storage&);
+ 
+@@ -107,15 +135,14 @@ public:
+ 		return NULL;
+ 	}
+ 
+-	bool store_pubkey (const std::string&keyid,
+-	                   const std::string&name,
+-	                   const std::string&alg,
+-	                   sencode*key) {
++	pubkey_entry* store_pubkey (const std::string&keyid,
++	                            const std::string&name,
++	                            const std::string&alg,
++	                            sencode*key) {
+ 
+-		if (pairs.count (keyid)) return false;
+-		if (pubs.count (keyid)) return false;
+-		pubs[keyid] = pubkey_entry (keyid, name, alg, key);
+-		return true;
++		if (pairs.count (keyid)) return NULL;
++		if (pubs.count (keyid)) return NULL;
++		return & (pubs[keyid] = pubkey_entry (keyid, name, alg, key));
+ 	}
+ 
+ 	void remove_pubkey (const std::string&keyid) {
+@@ -130,22 +157,34 @@ public:
+ 		return NULL;
+ 	}
+ 
+-	bool store_keypair (const std::string&keyid,
+-	                    const std::string&name,
+-	                    const std::string&alg,
+-	                    sencode*pubkey, sencode*privkey) {
++	keypair_entry* store_keypair (const std::string&keyid,
++	                              const std::string&name,
++	                              const std::string&alg,
++	                              sencode*pubkey, sencode*privkey) {
++
++		if (pairs.count (keyid)) return NULL;
++		if (pubs.count (keyid)) return NULL;
++		return & (pairs[keyid] = keypair_entry (keyid, name, alg,
++		                                        pubkey, privkey));
++	}
++
++	keypair_entry* store_keypair (const std::string&keyid,
++	                              const std::string&name,
++	                              const std::string&alg,
++	                              sencode*pubkey,
++	                              const std::string&privkey_raw) {
+ 
+-		if (pairs.count (keyid)) return false;
+-		if (pubs.count (keyid)) return false;
+-		pairs[keyid] = keypair_entry (keyid, name, alg,
+-		                              pubkey, privkey);
+-		return true;
++		if (pairs.count (keyid)) return NULL;
++		if (pubs.count (keyid)) return NULL;
++		return & (pairs[keyid] = keypair_entry (keyid, name, alg,
++		                                        pubkey, privkey_raw));
+ 	}
+ 
+ 	void remove_keypair (const std::string&keyid) {
+ 		if (pairs.count (keyid)) {
+ 			sencode_destroy (pairs[keyid].pub.key);
+-			sencode_destroy (pairs[keyid].privkey);
++			if (pairs[keyid].privkey)
++				sencode_destroy (pairs[keyid].privkey);
+ 			pairs.erase (keyid);
+ 		}
+ 	}
+diff --git a/src/main.cpp b/src/main.cpp
+index dd41dfb..ae38e1a 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -42,8 +42,8 @@ void print_help (char*pname)
+ 	out (" -T, --test     perform (probably nonexistent) testing/debugging stuff");
+ 	outeol;
+ 	out ("Global options:");
+-	out (" -R, --in      input file, default is stdin");
+-	out (" -o, --out     output file, default is stdout");
++	out (" -R, --in      set input file, default is stdin");
++	out (" -o, --out     set output file, default is stdout");
+ 	out (" -E, --err     the same for stderr");
+ 	out (" -a, --armor   use ascii-armored I/O");
+ 	out (" -y, --yes     assume that answer is `yes' everytime");
+@@ -76,12 +76,20 @@ void print_help (char*pname)
+ 	out (" -X, --delete-secret");
+ 	out (" -m, --rename         rename matching keys");
+ 	out (" -M, --rename-secret");
++	out (" -L, --lock           lock secrets");
++	out (" -U, --unlock         unlock secrets");
+ 	outeol;
+ 	out ("Key management options:");
+-	out (" -n, --no-action    on import, only show what would be imported");
+-	out (" -N, --name         specify a new name for renaming or importing");
+ 	out (" -F, --filter       only work with keys with matching names");
+ 	out (" -f, --fingerprint  format full key IDs nicely for human eyes");
++	out (" -N, --name         specify a new name for renaming or importing");
++	out (" -n, --no-action    on import, only show what would be imported");
++	out (" -w, --with-lock    specify the symmetric key for (un)locking the secrets");
++	out (" -w @SPEC           ask for password and expand it to a symmetric key");
++	out("                     of type SPEC for (un)locking the secret");
++	outeol;
++	out (" With -S and -w, using `@' as the key file name will cause the program to");
++	out (" interactively ask for a password and derive the symmetric key from it.");
+ 	outeol;
+ 	out ("Codecrypt eats data. Use it with caution.");
+ 	outeol;
+@@ -106,6 +114,7 @@ void test()
+  */
+ 
+ #include <getopt.h>
++#include <stdlib.h>
+ 
+ #include "actions.h"
+ #include "algo_suite.h"
+@@ -126,6 +135,7 @@ int main (int argc, char**argv)
+ 	std::string recipient, user,
+ 	    input, output, err_output,
+ 	    name, filter,
++	    withlock,
+ 	    action_param,
+ 	    detach_sign,
+ 	    symmetric;
+@@ -163,6 +173,9 @@ int main (int argc, char**argv)
+ 			{"delete-secret", 1,	0,	'X' },
+ 			{"rename-secret", 1,	0,	'M' },
+ 
++			{"lock",	0,	0,	'L' },
++			{"unlock",	0,	0,	'U' },
++
+ 			{"gen-key",	1,	0,	'g' },
+ 
+ 			{"name", 	1,	0,	'N' },
+@@ -171,6 +184,8 @@ int main (int argc, char**argv)
+ 			{"fingerprint",	0,	0,	'f' },
+ 			{"no-action",	0,	0,	'n' },
+ 
++			{"with-lock",	1,	0,	'w' },
++
+ 			//actions
+ 			{"sign",	0,	0,	's' },
+ 			{"verify",	0,	0,	'v' },
+@@ -188,7 +203,7 @@ int main (int argc, char**argv)
+ 		option_index = -1;
+ 		c = getopt_long
+ 		    (argc, argv,
+-		     "hVTayr:u:R:o:E:kipx:m:KIPX:M:g:N:F:fnsvedCb:S:",
++		     "hVTayr:u:R:o:E:kipx:m:KIPX:M:LUg:N:F:fnw:svedCb:S:",
+ 		     long_opts, &option_index);
+ 		if (c == -1) break;
+ 
+@@ -251,26 +266,32 @@ int main (int argc, char**argv)
+ 			read_action ('X')
+ 			read_action ('M')
+ 
+-			read_action ('g')
++			read_action ('U')
+ 
+ 			read_single_opt ('N', name,
+-			                 "please specify single name")
++			                 "specify a single name")
+ 			read_single_opt ('F', filter,
+-			                 "please specify single filter string")
++			                 "specify a single filter string")
+ 
+ 			read_flag ('f', opt_fingerprint)
+ 			read_flag ('n', opt_import_no_action)
+ 
++			read_single_opt ('w', withlock,
++			                 "specify a single key lock")
++
+ 			/*
+ 			 * combinations of s+e and d+v are possible. result is
+-			 * 'E' = "big encrypt with sig" and 'D' "big decrypt
+-			 * with verify".
++			 * 'E' = "big encrypt with sig", 'D' "big decrypt
++			 * with verify" and 'G' = "generate and lock"
+ 			 */
+ 			read_action_comb ('s', 'e', 'E')
+-			read_action_comb ('v', 'd', 'D')
+ 			read_action_comb ('e', 's', 'E')
++			read_action_comb ('v', 'd', 'D')
+ 			read_action_comb ('d', 'v', 'D')
+ 
++			read_action_comb ('g', 'L', 'G')
++			read_action_comb ('L', 'g', 'G')
++
+ 			read_flag ('C', opt_clearsign)
+ 			read_single_opt ('b', detach_sign,
+ 			                 "specify only one detach-sign file")
+@@ -312,6 +333,12 @@ int main (int argc, char**argv)
+ 	//register all available algorithms
+ 	fill_algorithm_suite (AS);
+ 
++	//default local user key from environment
++	if(user.empty()) {
++		const char*u=getenv("CCR_USER");
++		if(u) user=u;
++	}
++		
+ 	/*
+ 	 * cin/cout redirection
+ 	 */
+@@ -352,14 +379,18 @@ int main (int argc, char**argv)
+ 	}
+ 
+ 	if (symmetric.length()) switch (action) {
+-		case 'd':
+ 		case 'e':
+-		case 'g':
++		case 'd':
+ 		case 's':
+ 		case 'v':
++		case 'g':
++		case 'G':
++		case 'L':
++		case 'U':
+ 			break;
+ 		default:
+-			progerr ("specified action doesn't support symmetric operation");
++			progerr ("specified action doesn't support"
++			         " symmetric operation");
+ 			exitval = 1;
+ 			goto exit;
+ 		}
+@@ -367,36 +398,45 @@ int main (int argc, char**argv)
+ 	switch (action) {
+ 	case 'g':
+ 		exitval = action_gen_key (action_param, name,
+-		                          symmetric, opt_armor,
++		                          symmetric, withlock,
++		                          opt_armor, false,
++		                          KR, AS);
++		break;
++
++	case 'G':
++		exitval = action_gen_key (action_param, name,
++		                          symmetric, withlock,
++		                          opt_armor, true,
+ 		                          KR, AS);
+ 		break;
+ 
+ 	case 'e':
+ 		exitval = action_encrypt (recipient, opt_armor, symmetric,
+-		                          KR, AS);
++		                          withlock, KR, AS);
+ 		break;
+ 
+ 	case 'd':
+-		exitval = action_decrypt (opt_armor, symmetric, KR, AS);
++		exitval = action_decrypt (opt_armor, symmetric, withlock,
++		                          KR, AS);
+ 		break;
+ 
+ 	case 's':
+ 		exitval = action_sign (user, opt_armor, detach_sign,
+-		                       opt_clearsign, symmetric, KR, AS);
++		                       opt_clearsign, symmetric, withlock, KR, AS);
+ 		break;
+ 
+ 	case 'v':
+ 		exitval = action_verify (opt_armor, detach_sign, opt_clearsign,
+-		                         opt_yes, symmetric, KR, AS);
++		                         opt_yes, symmetric, withlock, KR, AS);
+ 		break;
+ 
+ 	case 'E':
+-		exitval = action_sign_encrypt (user, recipient, opt_armor,
+-		                               KR, AS);
++		exitval = action_sign_encrypt (user, recipient, withlock,
++		                               opt_armor, KR, AS);
+ 		break;
+ 
+ 	case 'D':
+-		exitval = action_decrypt_verify (opt_armor, opt_yes,
++		exitval = action_decrypt_verify (opt_armor, opt_yes, withlock,
+ 		                                 KR, AS);
+ 		break;
+ 
+@@ -445,6 +485,18 @@ int main (int argc, char**argv)
+ 		exitval = action_rename_sec (opt_yes, action_param, name, KR);
+ 		break;
+ 
++	case 'L':
++		exitval = action_lock_sec (opt_yes, filter,
++		                           symmetric, withlock,
++		                           opt_armor, KR);
++		break;
++
++	case 'U':
++		exitval = action_unlock_sec (opt_yes, filter,
++		                             symmetric, withlock,
++		                             opt_armor, KR);
++		break;
++
+ 	default:
+ 		progerr ("no action specified, use `--help'");
+ 		exitval = 1;
+diff --git a/src/message.cpp b/src/message.cpp
+index a66d6cc..f95a87e 100644
+--- a/src/message.cpp
++++ b/src/message.cpp
+@@ -84,19 +84,18 @@ int signed_msg::sign (const bvector&msg,
+ 
+ 	keyring::keypair_entry *k = kr.get_keypair (key_id);
+ 	if (!k) return 2;
++	//note that someone has to prepare the k->privkey in advance!
+ 
+ 	if (k->pub.alg != alg_id) return 3;
+ 
+-	bool privkey_dirty = false;
+ 	int r;
+-
+-	r = alg->sign (message, signature, & (k->privkey), privkey_dirty, rng);
++	r = alg->sign (message, signature, & (k->privkey), k->dirty, rng);
+ 
+ 	if (r) return r;
+ 
+-	if (privkey_dirty) {
++	if (k->dirty) {
+ 		//we can't output a signature without storing privkey changes!
+-		if (!kr.save()) return 4;
++		if (!kr.save (rng)) return 4;
+ 	}
+ 
+ 	return 0;
+diff --git a/src/privfile.cpp b/src/privfile.cpp
+new file mode 100644
+index 0000000..670598a
+--- /dev/null
++++ b/src/privfile.cpp
+@@ -0,0 +1,61 @@
++
++/*
++ * This file is part of Codecrypt.
++ *
++ * Copyright (C) 2013-2016 Mirek Kratochvil <exa.exa@gmail.com>
++ *
++ * Codecrypt is free software: you can redistribute it and/or modify it
++ * under the terms of the GNU Lesser General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or (at
++ * your option) any later version.
++ *
++ * Codecrypt is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
++ * License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public License
++ * along with Codecrypt. If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include "privfile.h"
++
++#include <sys/stat.h>
++#include <sys/types.h>
++#include <sys/file.h>
++#include <fcntl.h>
++#include <unistd.h>
++#include <errno.h>
++
++bool put_private_file (const std::string&fn,
++                       const std::string&contents, bool force_perms)
++{
++	struct stat st;
++	if (stat (fn.c_str(), &st)) {
++		if (errno != ENOENT)
++			return false;
++
++		//if it simply doesn't exist, create it
++		int fd;
++		fd = creat (fn.c_str(), S_IRUSR | S_IWUSR);
++		if (fd < 0) return false;
++		ssize_t res = write (fd, contents.c_str(),
++		                     contents.length());
++		if (close (fd)) return false;
++		if ( (size_t) res != contents.length()) return false;
++
++	} else {
++		if (!S_ISREG (st.st_mode))
++			return false;
++
++		//remove others' read/write. group r/w is untouched.
++		if (force_perms && (st.st_mode & 07)) {
++			if (chmod (fn.c_str(), st.st_mode & ~07))
++				return false;
++		}
++	}
++
++	if (access (fn.c_str(), R_OK | W_OK)) return false;
++
++	return true;
++}
+diff --git a/src/privfile.h b/src/privfile.h
+new file mode 100644
+index 0000000..41d5979
+--- /dev/null
++++ b/src/privfile.h
+@@ -0,0 +1,30 @@
++
++/*
++ * This file is part of Codecrypt.
++ *
++ * Copyright (C) 2013-2016 Mirek Kratochvil <exa.exa@gmail.com>
++ *
++ * Codecrypt is free software: you can redistribute it and/or modify it
++ * under the terms of the GNU Lesser General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or (at
++ * your option) any later version.
++ *
++ * Codecrypt is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
++ * License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public License
++ * along with Codecrypt. If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#ifndef _ccr_privfile_h_
++#define _ccr_privfile_h_
++
++#include <string>
++
++bool put_private_file (const std::string&fn,
++                       const std::string&contents,
++                       bool force_permissions);
++
++#endif
+diff --git a/src/pwrng.cpp b/src/pwrng.cpp
+new file mode 100644
+index 0000000..e6ea49a
+--- /dev/null
++++ b/src/pwrng.cpp
+@@ -0,0 +1,99 @@
++
++/*
++ * This file is part of Codecrypt.
++ *
++ * Copyright (C) 2013-2017 Mirek Kratochvil <exa.exa@gmail.com>
++ *
++ * Codecrypt is free software: you can redistribute it and/or modify it
++ * under the terms of the GNU Lesser General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or (at
++ * your option) any later version.
++ *
++ * Codecrypt is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
++ * License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public License
++ * along with Codecrypt. If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include "pwrng.h"
++
++#include "iohelpers.h"
++#include <stdlib.h>
++
++#if (HAVE_READPASSPHRASE == 1)
++#include <readpassphrase.h>
++#elif (HAVE_BSDREADPASSPHRASE == 1)
++#include <bsd/readpassphrase.h>
++#else
++#warning "Falling back to getpass(3), which is marked obsolete!"
++/* If you see this, you might as well want to take the readpassphrase()
++ * implementation from e.g. openssh's openbsd-compat and put it here. */
++#include <unistd.h>
++#endif
++
++#define MAX_PW_LEN 1024 //like if someone enjoyed typing that.
++
++static bool read_password (const std::string&prompt, std::string&pw)
++{
++#if (HAVE_READPASSPHRASE == 1 || HAVE_BSDREADPASSPHRASE==1)
++	/* readpassphrase reads at most bufsiz-1 bytes and gets the terminating
++	 * zero just right */
++	std::vector<char> pwbuf;
++	pwbuf.resize (MAX_PW_LEN, 0);
++	if (!readpassphrase (prompt.c_str(), pwbuf.data(), MAX_PW_LEN,
++	                     RPP_REQUIRE_TTY))
++		return false;
++
++	pw = pwbuf.data();
++	return true;
++#else
++	char* pass = getpass (prompt.c_str());
++	if (!pass) return false;
++	pw = pass;
++	return true;
++#endif
++}
++
++bool pw_rng::seed_from_user_password (const std::string&reason,
++                                      const std::string&env_var,
++                                      bool verify)
++{
++
++	std::string pw;
++
++	const char*env = getenv (env_var.c_str());
++	if (env) {
++		pw = env;
++		err ("Password for "
++		     << reason
++		     << " successfully read from environment "
++		     << env_var);
++	} else {
++		if (!read_password
++		    ("Enter password for " + reason + ": ", pw)) {
++			err ("pwrng: interactive password reading failed");
++			return false;
++		}
++
++		if (verify) {
++			std::string pw2;
++			if (!read_password
++			    ("Same password again for verification: ",
++			     pw2)) {
++				err ("pwrng: password verification failed");
++				return false;
++			}
++			if (pw != pw2) {
++				err ("Passwords do not match!");
++				return false;
++			}
++		}
++	}
++
++	r.load_key ( (byte*) pw.data(),
++	             (byte*) (pw.data() + pw.length()));
++	return true;
++}
+diff --git a/src/pwrng.h b/src/pwrng.h
+new file mode 100644
+index 0000000..e505957
+--- /dev/null
++++ b/src/pwrng.h
+@@ -0,0 +1,90 @@
++
++/*
++ * This file is part of Codecrypt.
++ *
++ * Copyright (C) 2013-2016 Mirek Kratochvil <exa.exa@gmail.com>
++ *
++ * Codecrypt is free software: you can redistribute it and/or modify it
++ * under the terms of the GNU Lesser General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or (at
++ * your option) any later version.
++ *
++ * Codecrypt is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
++ * License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public License
++ * along with Codecrypt. If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#ifndef _ccr_pwrng_h_
++#define _ccr_pwrng_h_
++
++#include "arcfour.h"
++#include "prng.h"
++
++#include <stdint.h>
++
++class pw_rng : public prng
++{
++public:
++	/*
++	 * Using wide arcfour for this purpose might seem weird, but:
++	 *
++	 * - it has large memory requirements
++	 *   (1Mbit, with possible ~0.95Mbit of entropy)
++	 *
++	 * - it takes some (very easily parametrizable) amount of time to seed,
++	 *   touching the above memory more or less randomly in the process
++	 *
++	 * - "retry rate" is constrained by how many passwords the human user
++	 *   can enter per time unit, which (together with the fact that the
++	 *   output of this thing is not supposed to get broadcasted directly)
++	 *   mostly disables all the known statistical attacks on arcfour
++	 *
++	 * - it's a highly nonstandard variant of a well-understood concept
++	 *   (therefore a good candidate for codecrypt right?)
++	 *
++	 * - arcfour is fast, but notably immune to vectorization and similar
++	 *   speedups.
++	 *
++	 * The other variant would be scrypt, which we don't implement for two
++	 * reasons:
++	 *
++	 * - there's currently an scrypt-based cryptocoin, which provides
++	 * insane amount of available inversion power against scrypt, which, if
++	 * slightly abused, would invert any password-based key in seconds
++	 *
++	 * - admit it, arcfour is nicer
++	 *
++	 * Discarding 1M of output is very probably good for most uses (it
++	 * permutes well and takes just around 50ms to run on current
++	 * mainstream hardware) but YMMV.
++	 *
++	 * Please report any reasonable cases against this parameter choice.
++	 */
++
++	arcfour<uint16_t, 16, 1024 * 1024> r;
++
++	void init () {
++		r.init();
++	}
++
++	void clear() {
++		r.clear();
++	}
++
++	bool seed_from_user_password (const std::string& reason,
++	                              const std::string& env_var,
++	                              bool verify);
++
++	typedef uint64_t randmax_t;
++	uint random (uint n) {
++		randmax_t i;
++		r.gen (sizeof (randmax_t), (byte*) &i);
++		return i % n;
++	}
++};
++
++#endif
+diff --git a/src/seclock.cpp b/src/seclock.cpp
+new file mode 100644
+index 0000000..bad38ca
+--- /dev/null
++++ b/src/seclock.cpp
+@@ -0,0 +1,135 @@
++
++/*
++ * This file is part of Codecrypt.
++ *
++ * Copyright (C) 2013-2017 Mirek Kratochvil <exa.exa@gmail.com>
++ *
++ * Codecrypt is free software: you can redistribute it and/or modify it
++ * under the terms of the GNU Lesser General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or (at
++ * your option) any later version.
++ *
++ * Codecrypt is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
++ * License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public License
++ * along with Codecrypt. If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include "seclock.h"
++
++#include "pwrng.h"
++#include "iohelpers.h"
++
++#include <sstream>
++#include <string>
++
++#include <stdlib.h>
++
++#define LOCKED_PREFIX "ccr_lock"
++#define LOCKED_PREFIX_LEN 8
++
++bool looks_like_locked_secret (const std::string&s)
++{
++	std::string prefix = LOCKED_PREFIX;
++	/*
++	 * unlocked version of this thing is always some kind of sencode, which
++	 * will never start with 'ccr_lock'. Abusing it right here.
++	 */
++	return s.length() > LOCKED_PREFIX_LEN
++	       && s.substr (0, LOCKED_PREFIX_LEN) == LOCKED_PREFIX;
++}
++
++bool load_lock_secret (symkey&sk,
++                       std::string withlock,
++                       const std::string &reason,
++                       const std::string &secret_type,
++                       bool for_locking)
++{
++	if (withlock == "") withlock = "@"; //default for password
++	if (withlock[0] == '@') {
++		//ask the user and generate a symmetric key
++		pw_rng r;
++		r.init();
++		if (!r.seed_from_user_password
++		    ( (for_locking ? "locking " : "unlocking ") + reason,
++		      "CCR_" + secret_type + "_PASSWORD",
++		      for_locking))
++			return false;
++
++		withlock.erase (0, 1); //delete the @
++		if (withlock.empty()) {
++			std::string alg = "CCR_" + secret_type + "_ALGORITHM";
++			const char* algorithm = getenv (alg.c_str());
++			if (algorithm) withlock = algorithm;
++			else withlock = "CHACHA20,CUBE512,SHORTBLOCK";
++			//TODO make sure this is synced with synonyms
++		}
++		return sk.create (withlock, r);
++	} else {
++		return sk.load (withlock, "", false, false);
++	}
++}
++
++bool lock_secret (const std::string &secret, std::string &locked,
++                  const std::string &withlock,
++                  const std::string &reason,
++                  const std::string &secret_type,
++                  prng&rng)
++{
++
++	symkey sk;
++	if (!load_lock_secret (sk, withlock, reason, secret_type, true))
++		return false;
++
++	return lock_secret_sk (secret, locked, sk, rng);
++}
++
++bool lock_secret_sk (const std::string &secret, std::string &locked,
++                     symkey&sk, prng&rng)
++{
++	std::istringstream i (secret);
++	std::ostringstream o;
++	o << LOCKED_PREFIX;
++	bool ret = sk.encrypt (i, o, rng);
++	locked = o.str();
++	return ret;
++}
++
++
++bool unlock_secret_sk (const std::string &locked, std::string &secret,
++                       const std::string &withlock,
++                       const std::string &reason,
++                       const std::string &secret_type,
++                       symkey&sk)
++{
++	if (!looks_like_locked_secret (locked)) {
++		err ("seclock: malformed locked secret");
++		return false;
++	}
++
++	if (!load_lock_secret (sk, withlock, reason, secret_type, false))
++		return false;
++
++
++	std::istringstream i (locked);
++	i.ignore (LOCKED_PREFIX_LEN);
++	std::ostringstream o;
++	bool ret = !sk.decrypt (i, o); //returns int!
++	secret = o.str();
++	if (!ret) err ("error: unlocking a secret failed,"
++		               " double check you password/symkey");
++	return ret;
++}
++
++bool unlock_secret (const std::string &locked, std::string &secret,
++                    const std::string &withlock,
++                    const std::string &reason,
++                    const std::string &secret_type)
++{
++	symkey sk;
++	return unlock_secret_sk (locked, secret, withlock,
++	                         reason, secret_type, sk);
++}
+diff --git a/src/seclock.h b/src/seclock.h
+new file mode 100644
+index 0000000..1d5c008
+--- /dev/null
++++ b/src/seclock.h
+@@ -0,0 +1,52 @@
++
++/*
++ * This file is part of Codecrypt.
++ *
++ * Copyright (C) 2013-2016 Mirek Kratochvil <exa.exa@gmail.com>
++ *
++ * Codecrypt is free software: you can redistribute it and/or modify it
++ * under the terms of the GNU Lesser General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or (at
++ * your option) any later version.
++ *
++ * Codecrypt is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
++ * License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public License
++ * along with Codecrypt. If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#ifndef _ccr_seclock_h_
++#define _ccr_seclock_h_
++
++#include <string>
++
++#include "prng.h"
++#include "symkey.h"
++
++bool looks_like_locked_secret (const std::string&);
++bool load_lock_secret (symkey&sk,
++                       std::string withlock,
++                       const std::string &reason,
++                       const std::string &secret_type,
++                       bool for_locking);
++bool lock_secret (const std::string&secret, std::string&locked,
++                  const std::string&withlock,
++                  const std::string&reason,
++                  const std::string&secret_type,
++                  prng&rng);
++bool lock_secret_sk (const std::string&secret, std::string&locked,
++                     symkey&sk, prng&rng);
++bool unlock_secret (const std::string&locked, std::string&secret,
++                    const std::string&withlock,
++                    const std::string&reason,
++                    const std::string&secret_type);
++bool unlock_secret_sk (const std::string&locked, std::string&secret,
++                       const std::string&withlock,
++                       const std::string&reason,
++                       const std::string&secret_type,
++                       symkey&sk);
++
++#endif
+diff --git a/src/symkey.cpp b/src/symkey.cpp
+index e04c3dd..3675c9e 100644
+--- a/src/symkey.cpp
++++ b/src/symkey.cpp
+@@ -20,10 +20,11 @@
+ 
+ #include "symkey.h"
+ 
+-#include "sc.h"
+ #include "hash.h"
+-#include "str_match.h"
+ #include "iohelpers.h"
++#include "privfile.h"
++#include "sc.h"
++#include "str_match.h"
+ 
+ #include <sstream>
+ 
+@@ -84,6 +85,115 @@ bool symkey::create (const std::string&in, prng&rng)
+ 	return true;
+ }
+ 
++/*
++ * loading/saving
++ */
++
++#include "envelope.h"
++#include "base64.h"
++#include "seclock.h"
++
++#define ENVELOPE_SYMKEY "symkey"
++
++bool symkey::load (const std::string&fn, const std::string&withlock,
++                   bool for_encryption, bool armor)
++{
++	if (fn.length() && fn[0] == '@') {
++		//shared-secret password is requested
++		return load_lock_secret (*this, fn, "expanding shared secret",
++		                         "SYMMETRIC", for_encryption);
++	}
++
++	std::ifstream sk_in;
++	sk_in.open (fn == "-" ? "/dev/stdin" : fn.c_str(),
++	            std::ios::in | std::ios::binary);
++
++	if (!sk_in) {
++		err ("error: can't open symkey file");
++		return false;
++	}
++
++	std::string sk_data;
++	if (!read_all_input (sk_data, sk_in)) {
++		err ("error: can't read symkey");
++		return false;
++	}
++	sk_in.close();
++
++	if (armor) {
++		std::vector<std::string> parts;
++		std::string type;
++		if (!envelope_read (sk_data, 0, type, parts)) {
++			err ("error: no data envelope found");
++			return false;
++		}
++
++		if (type != ENVELOPE_SYMKEY || parts.size() != 1) {
++			err ("error: wrong envelope format");
++			return false;
++		}
++
++		if (!base64_decode (parts[0], sk_data)) {
++			err ("error: malformed data");
++			return false;
++		}
++	}
++
++	if (looks_like_locked_secret (sk_data)) {
++		std::string tmp;
++		if (!unlock_secret (sk_data, tmp,
++		                    withlock, fn, "SYMKEY")) return false;
++		sk_data = tmp;
++	}
++
++	sencode*SK = sencode_decode (sk_data);
++	if (!SK) {
++		err ("error: could not parse input sencode");
++		return false;
++	}
++
++	if (!unserialize (SK)) {
++		err ("error: could not parse input structure");
++		sencode_destroy (SK);
++		return false;
++	}
++
++	sencode_destroy (SK);
++
++	return true;
++}
++
++bool symkey::save (const std::string&fn, const std::string&withlock,
++                   bool armor, bool force_lock, prng&r)
++{
++	sencode*SK = serialize();
++	std::string data = SK->encode();
++	sencode_destroy (SK);
++
++	if (force_lock) {
++		std::string tmp;
++		if (!lock_secret (data, tmp, withlock, fn, "SYMKEY", r))
++			return false;
++		data = tmp;
++	}
++
++	if (armor) {
++		std::vector<std::string> parts;
++		parts.resize (1);
++		base64_encode (data, parts[0]);
++		data = envelope_format (ENVELOPE_SYMKEY, parts, r);
++	}
++
++	bool to_stdout = (fn == "-");
++	if (!put_private_file (to_stdout ? "/dev/stdout" : fn,
++	                       data, !to_stdout)) {
++		err ("error: can't write to symkey file");
++		return false;
++	}
++
++	return true;
++}
++
+ typedef std::list<instanceof<streamcipher> > scs_t;
+ typedef std::list<instanceof<hash_proc> > hashes_t;
+ 
+diff --git a/src/symkey.h b/src/symkey.h
+index 22718e9..6c9c41e 100644
+--- a/src/symkey.h
++++ b/src/symkey.h
+@@ -28,7 +28,7 @@
+ #include <vector>
+ 
+ #include "types.h"
+-#include "generator.h"
++#include "prng.h"
+ #include "sencode.h"
+ 
+ class symkey
+@@ -48,6 +48,11 @@ public:
+ 
+ 	bool is_valid();
+ 	bool create (const std::string&, prng&);
++
++	bool load (const std::string&fn, const std::string&withlock,
++	           bool for_encryption, bool armor);
++	bool save (const std::string&fn, const std::string&withlock,
++	           bool armor, bool force_lock, prng&r);
+ };
+ 
+ #endif

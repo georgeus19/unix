@@ -1,0 +1,12 @@
+diff --git a/src/message.cpp b/src/message.cpp
+--- a/src/message.cpp
++++ b/src/message.cpp
++	//note that someone has to prepare the k->privkey in advance!
+-	bool privkey_dirty = false;
+-
+-	r = alg->sign (message, signature, & (k->privkey), privkey_dirty, rng);
++	r = alg->sign (message, signature, & (k->privkey), k->dirty, rng);
+-	if (privkey_dirty) {
++	if (k->dirty) {
+-		if (!kr.save()) return 4;
++		if (!kr.save (rng)) return 4;
