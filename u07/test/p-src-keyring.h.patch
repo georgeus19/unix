@@ -1,0 +1,83 @@
+--- a/src/keyring.h
++++ b/src/keyring.h
++#include "symkey.h"
++
++		bool locked; //store encrypted
++		symkey sk;
++		bool dirty; //privkey_raw needs to be updated
++
++		std::string privkey_raw;
++
++		bool decode_privkey (const std::string&withlock);
++		bool lock (const std::string&withlock);
++		bool unlock (const std::string&withlock);
++		bool fix_dirty (prng&rng);
++			dirty = false;
+-			: pub (KID, N, A, PubK), privkey (PrivK) {}
++			: pub (KID, N, A, PubK),
++			  privkey (PrivK),
++			  locked (false),
++			  dirty (true)
++		{}
++
++		keypair_entry (const std::string&KID,
++		               const std::string& N,
++		               const std::string& A,
++		               sencode*PubK,
++		               const std::string&PrivK_raw)
++			: pub (KID, N, A, PubK),
++			  privkey (NULL),
++			  dirty (false),
++			  privkey_raw (PrivK_raw)
++		{}
+-	bool save();
++	bool save (prng&rng);
+-	static sencode* serialize_keypairs (const keypair_storage&);
++	static sencode* serialize_keypairs (keypair_storage&, prng&rng);
+-	bool store_pubkey (const std::string&keyid,
+-	                   const std::string&name,
+-	                   const std::string&alg,
+-	                   sencode*key) {
++	pubkey_entry* store_pubkey (const std::string&keyid,
++	                            const std::string&name,
++	                            const std::string&alg,
++	                            sencode*key) {
+-		if (pairs.count (keyid)) return false;
+-		if (pubs.count (keyid)) return false;
+-		pubs[keyid] = pubkey_entry (keyid, name, alg, key);
+-		return true;
++		if (pairs.count (keyid)) return NULL;
++		if (pubs.count (keyid)) return NULL;
++		return & (pubs[keyid] = pubkey_entry (keyid, name, alg, key));
+-	bool store_keypair (const std::string&keyid,
+-	                    const std::string&name,
+-	                    const std::string&alg,
+-	                    sencode*pubkey, sencode*privkey) {
++	keypair_entry* store_keypair (const std::string&keyid,
++	                              const std::string&name,
++	                              const std::string&alg,
++	                              sencode*pubkey, sencode*privkey) {
++
++		if (pairs.count (keyid)) return NULL;
++		if (pubs.count (keyid)) return NULL;
++		return & (pairs[keyid] = keypair_entry (keyid, name, alg,
++		                                        pubkey, privkey));
++	}
++
++	keypair_entry* store_keypair (const std::string&keyid,
++	                              const std::string&name,
++	                              const std::string&alg,
++	                              sencode*pubkey,
++	                              const std::string&privkey_raw) {
+-		if (pairs.count (keyid)) return false;
+-		if (pubs.count (keyid)) return false;
+-		pairs[keyid] = keypair_entry (keyid, name, alg,
+-		                              pubkey, privkey);
+-		return true;
++		if (pairs.count (keyid)) return NULL;
++		if (pubs.count (keyid)) return NULL;
++		return & (pairs[keyid] = keypair_entry (keyid, name, alg,
++		                                        pubkey, privkey_raw));
+-			sencode_destroy (pairs[keyid].privkey);
++			if (pairs[keyid].privkey)
++				sencode_destroy (pairs[keyid].privkey);

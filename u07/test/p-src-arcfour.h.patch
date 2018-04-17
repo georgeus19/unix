@@ -1,0 +1,45 @@
+--- a/src/arcfour.h
++++ b/src/arcfour.h
+-		if ( (inttype) (1 << bits)) mask %= 1 << bits;
++		if ( (inttype) (1 << bits) != 0) mask %= 1 << bits;
+-	void load_key (const inttype*begin, const inttype*end) {
++	//ugly byte padding with zeroes for streamcipher compatibility
++	void load_key (const byte*begin, const byte*end) {
++		inttype j, t;
++		size_t i;
++		const byte *keypos;
++
++		//eat whole key iteratively, even if longer than permutation
++		for (; begin < end; begin += mask + 1) {
++			j = 0;
++			for (i = 0, keypos = begin;
++			     i <= mask;
++			     ++i, ++keypos) {
++				if (keypos >= end) keypos = begin; //rotate
++				j = (j + S[i] + (*keypos)) & mask;
++				t = S[j];
++				S[j] = S[i];
++				S[i] = t;
++			}
++		}
++
++		discard (disc_bytes);
++	}
++
++	//this works on wide keys
++	void load_wkey (const inttype*begin, const inttype*end) {
+-	inttype gen() {
++	inline byte gen() {
++		return genw();
++	}
++
++	inttype genw() {
+-	void gen (size_t n, inttype*out) {
++	void gen (size_t n, byte*out) {
++	void genw (size_t n, inttype*out) {
++		if (out)
++			for (size_t i = 0; i < n; ++i) out[i] = genw();
++		else
++			for (size_t i = 0; i < n; ++i) genw();
++	}
++

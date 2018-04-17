@@ -4,8 +4,8 @@ declare -i counter=1
 	cat $1 | grep "^diff" > nazvy
 csplit -s pom /'diff -'/ {*}
 cat nazvy | while read line ; do
-        nazev1=`echo $line | grep -o "[^ /]/[^ ]*$" | tr '/' '-'`
-        nazev="$2/$nazev1.patch"
+        nazev1=`echo $line | grep -o "/[^ ]*$" | tr '/' '-'`
+        nazev="$2/p$nazev1.patch"
 
 	if [ $counter -gt 9 ] ; then
         	puvodni="xx$counter"

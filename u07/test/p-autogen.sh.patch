@@ -1,0 +1,4 @@
+--- a/autogen.sh
++++ b/autogen.sh
+-echo "${NAME}_LDADD = -lgmp -lfftw3 -lm \$(CRYPTOPP_LIBS) ${COMMON_LDADD} " >>$OUT
++echo "${NAME}_LDADD = -lgmp -lfftw3 -lm \$(CRYPTOPP_LIBS) ${COMMON_LDADD} \$(EXTRA_LIBS) " >>$OUT
