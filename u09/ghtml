@@ -1,0 +1,11 @@
+#!/bin/bash
+echo "<html><body>" > index.html
+for i in *.thumb.jpg ; do
+ab=`echo "$i" | sed 's/\([^.]*\).thumb\(.jpg\)/\1\2/'`  ;
+printf "\n<a href=\"" >> index.html ;
+printf "$ab" >> index.html ;
+printf "\"><img src=\"" >> index.html ;
+printf "$i" >> index.html ; printf "\"></a>" >> index.html ; 
+done
+echo "</body></html>" >> index.html
+
