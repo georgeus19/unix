@@ -1,0 +1,17 @@
+NAME:
+	todo - Stores a line of text(=record) into a todolist(=file)
+	to execute: path/todo [OPTIONS] 
+		    or if in the same dir: ./todo [OPTIONS]
+
+OPTIONS:
+	-a "record text" 
+		Add a record to the todolist.
+		To add more than one record: -a numberofrecords ".." ".."
+		Records can't start with "-".
+
+	-w
+		Display todolist records.
+
+	-d "number of a line of a record to delete"
+		Delete a record from the todolist.
+		To delete more than one record: -d number,number,... 
