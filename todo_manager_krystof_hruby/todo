@@ -1,0 +1,105 @@
+#!/bin/bash
+do_help=no
+ret_val=0
+records=""
+#todo_pwd=`echo $0 | sed 's=\(.*\)\(todo\)=\1=g'`
+todo_pwd=`echo $0`
+list="list"
+todolist="$todo_pwd$list"
+#echo $todolist
+touch $todolist
+tmp_file=$$1
+tmp_file_del=$$2
+tmp_file_del2=$$3
+echo_todolist="no"
+to_delete=""
+touch $tmp_file_del2
+touch $tmp_file
+touch $tmp_file_del
+while [ -n "$1" ] ; do
+	case "$1" in
+	--help)
+		do_help=yes
+		break
+		;;
+	-a)	#Adding records to todolist
+		shift
+		number_records_add=`echo $1 | grep  "[0-9]"`
+		number_records_add_number=`echo $1 | grep -o "[0-9]*"`
+		if [[ "$number_records_add" != "$1" || $number_records_add != $number_records_add_number ]] ; then
+			#echo $number_records_add
+			#echo $number_records_add_number
+			#echo $1
+			number_records_add=1
+		fi
+		i=0
+		while [ $i -lt  $number_records_add ] ; do 
+			#If in $i is number of record to add, we need to shift to get the first record in $i
+			if [[ $i -eq 0 && $number_records_add -gt 1 ]] ; then
+				shift
+			fi
+			#If $1 is already the first record (=adding one record by default -a "txt"), we do not shift
+			if [ $i -gt 0 ] ; then 
+				shift
+			fi
+			record=`echo $1 | grep "^-"`
+			#If there is the same count of records to add as in number_records_add, if not -> else branch
+			if [[ -n "$1"  && -z $record ]] ; then
+				echo "$1" >> $tmp_file 
+			else
+				echo "No record to add found" >&2
+				ret_val=1
+				break
+			fi
+			i=$(($i+1))
+		done
+		;;
+	-w)
+		echo_todolist="yes"
+		;;
+	-d)	#Deleting records from todolist
+		shift
+		arg=`echo $1 | grep "^-"`
+		if [[ -n "$1" && -z "$arg" ]] ; then
+			to_delete="$1"
+		else
+			ret_val=3
+			echo "Wrong record-line-index format to delete" >&2
+			break
+		fi
+		;;
+	*)
+		ret_val=2
+		break
+		;;
+	esac
+	shift
+done
+#if option --help was chosen
+if [ "$do_help" = "yes" ] ; then
+	echo "zatim nic"
+	rm $tmp_file_del $tmp_file $tmp_file_del2
+	exit $ret_val
+fi
+#If error in options occured
+if [ $ret_val -gt 0 ] ; then
+	echo 'try "./todo --help" for more information' >&2
+	rm $tmp_file $tmp_file_del $tmp_file_del2
+	exit $ret_val
+fi
+#Deleting records
+if [ -n "$to_delete" ] ; then
+	cat $todolist > $tmp_file_del
+	echo $to_delete | tr ',' '\n' > $tmp_file_del2
+	while read line ; do
+		cat $tmp_file_del | sed -e "$line"'d' > $todolist
+		cat $todolist > $tmp_file_del
+	done <$tmp_file_del2
+fi
+#Adding records to todolist and destroying temporary files
+cat $tmp_file >> $todolist
+rm $tmp_file $tmp_file_del $tmp_file_del2
+#Displaying todolist on screen
+if [ $echo_todolist = "yes" ] ; then
+	cat -n $todolist
+fi
