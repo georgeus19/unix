@@ -13,6 +13,7 @@ tmp_file_del="$HOME/.$$2"
 tmp_file_del2="$HOME/.$$3"
 tmp_time_stamp="$HOME/.$$4"
 tmp_dl_file="$HOME/.$$5"
+tmp_deadline_tab="$HOME/.$$7"
 echo_todolist="no"
 to_delete=""
 do_deadline="no"
@@ -43,6 +44,7 @@ while [ -n "$1" ] ; do
 		fi
 		i=0
 		printf "" > $tmp_file
+		printf "" > $tmp_deadline_tab
 		printf "" > $tmp_time_stamp
 		while [ $i -lt  $number_records_add ] ; do 
 			#If in $i is number of record to add, we need to shift to get the first record in $i
@@ -59,7 +61,8 @@ while [ -n "$1" ] ; do
 				do_add="yes"
 				add_deadline="yes"
 				printf "\t" >> $tmp_time_stamp
-				date >> $tmp_time_stamp 
+				echo -e "\t" >> $tmp_deadline_tab
+				date -R | sed 's=\([^+]*\)\(+.*\)=\1=g' >> $tmp_time_stamp 
 				echo "$1" >> $tmp_file 
 			else
 				echo "No record to add found" >&2
@@ -139,22 +142,26 @@ if [ -n "$to_delete" ] ; then
 fi
 #Adding records to todolist and destroying temporary files
 if [ "$do_add" = "yes" ] ; then
+	tmp_dlfile="$HOME/.$$6"
 	if [ "$do_deadline" = "yes" ] ; then
-		tmp_dlfile="$HOME/.$$6"
 		touch $tmp_dlfile
 		paste $tmp_file $tmp_dl_file > $tmp_dlfile
 		cat $tmp_dlfile > $tmp_file
-		rm $tmp_dlfile
+	else
+		
+		touch $tmp_dlfile
+		paste $tmp_file $tmp_deadline_tab > $tmp_dlfile
+		cat $tmp_dlfile > $tmp_file
 	fi
 	paste $tmp_file $tmp_time_stamp >> $todolist
-	rm $tmp_file $tmp_time_stamp
+	rm -f $tmp_file $tmp_time_stamp $tmp_deadline_tab $tmp_dl_file $tmp_dlfile
 fi
-
 #Displaying todolist on screen
 if [ $echo_todolist = "yes" ] ; then
 	#magic with colors
 	NC='\033[0m'
 	GREEN='\033[0;32m'
-	echo -e "\t${GREEN}records\t\tday added${NC}"
+	echo -e "\t${GREEN}records\t\tdeadline\tday added${NC}"
 	cat -n $todolist
 fi
+
