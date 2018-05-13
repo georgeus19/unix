@@ -14,5 +14,5 @@ OPTIONS:
 
 	-d "number of a line of a record to delete"
 		Delete a record from the todolist.
-		To delete more than one record(number1>number2): -d number1,number2,...,
+		To delete more than one record(number1>number2): -d number1,number2,...
 			-typing -d number2,number1,... would delete line number2 and line number1+1

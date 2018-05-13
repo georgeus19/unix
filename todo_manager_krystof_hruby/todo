@@ -3,19 +3,23 @@ do_help=no
 ret_val=0
 records=""
 #todo_pwd=`echo $0 | sed 's=\(.*\)\(todo\)=\1=g'`
-todo_pwd=`echo $0`
-list="list"
-todolist="$todo_pwd$list"
-#echo $todolist
+#todo_pwd=`echo $0`
+#list="list"
+todolist="$HOME/.todolist"
+do_add="no"
 touch $todolist
-tmp_file=$$1
-tmp_file_del=$$2
-tmp_file_del2=$$3
+tmp_file="$HOME/.$$1"
+tmp_file_del="$HOME/.$$2"
+tmp_file_del2="$HOME/.$$3"
+tmp_time_stamp="$HOME/.$$4"
+tmp_dl_file="$HOME/.$$5"
 echo_todolist="no"
 to_delete=""
-touch $tmp_file_del2
-touch $tmp_file
-touch $tmp_file_del
+do_deadline="no"
+add_deadline="no"
+#touch $tmp_file_del2
+#touch $tmp_file
+#touch $tmp_file_del
 while [ -n "$1" ] ; do
 	case "$1" in
 	--help)
@@ -24,6 +28,11 @@ while [ -n "$1" ] ; do
 		;;
 	-a)	#Adding records to todolist
 		shift
+		if [ -z "$1" ] ; then
+                	echo "No record to add found" >&2
+                        ret_val=1
+                        break
+                        fi
 		number_records_add=`echo $1 | grep  "[0-9]"`
 		number_records_add_number=`echo $1 | grep -o "[0-9]*"`
 		if [[ "$number_records_add" != "$1" || $number_records_add != $number_records_add_number ]] ; then
@@ -33,6 +42,8 @@ while [ -n "$1" ] ; do
 			number_records_add=1
 		fi
 		i=0
+		printf "" > $tmp_file
+		printf "" > $tmp_time_stamp
 		while [ $i -lt  $number_records_add ] ; do 
 			#If in $i is number of record to add, we need to shift to get the first record in $i
 			if [[ $i -eq 0 && $number_records_add -gt 1 ]] ; then
@@ -45,6 +56,10 @@ while [ -n "$1" ] ; do
 			record=`echo $1 | grep "^-"`
 			#If there is the same count of records to add as in number_records_add, if not -> else branch
 			if [[ -n "$1"  && -z $record ]] ; then
+				do_add="yes"
+				add_deadline="yes"
+				printf "\t" >> $tmp_time_stamp
+				date >> $tmp_time_stamp 
 				echo "$1" >> $tmp_file 
 			else
 				echo "No record to add found" >&2
@@ -68,6 +83,29 @@ while [ -n "$1" ] ; do
 			break
 		fi
 		;;
+	-t)	
+		do_deadline="yes"
+		printf "" > $tmp_dl_file
+		number_deadline=0
+		if [[ "$add_deadline" = "no" ]] ; then
+			ret_val=4		
+			echo "Wrong deadline format" >&2
+			break
+		else
+			while [ $number_deadline -lt $number_records_add ] ; do
+				shift
+				tmp_deadline=`echo $1 | grep "^-"`
+				if [[ -n "$1" && -z "$tmp_deadline" ]] ; then
+					echo -e "\t$1" >> $tmp_dl_file
+				else
+					ret_val=4
+		                        echo "Wrong deadline format" >&2
+                		        break
+				fi
+				number_deadline=$(($number_deadline+1))
+			done
+		fi
+		;;
 	*)
 		ret_val=2
 		break
@@ -78,28 +116,45 @@ done
 #if option --help was chosen
 if [ "$do_help" = "yes" ] ; then
 	echo "zatim nic"
-	rm $tmp_file_del $tmp_file $tmp_file_del2
+	rm -f $tmp_file $tmp_time_stamp
 	exit $ret_val
 fi
 #If error in options occured
 if [ $ret_val -gt 0 ] ; then
 	echo 'try "./todo --help" for more information' >&2
-	rm $tmp_file $tmp_file_del $tmp_file_del2
+	rm -f $tmp_file $tmp_time_stamp
 	exit $ret_val
 fi
 #Deleting records
 if [ -n "$to_delete" ] ; then
+	printf "" > $tmp_file_del
+	printf "" > $tmp_file_del2
 	cat $todolist > $tmp_file_del
 	echo $to_delete | tr ',' '\n' > $tmp_file_del2
 	while read line ; do
 		cat $tmp_file_del | sed -e "$line"'d' > $todolist
 		cat $todolist > $tmp_file_del
 	done <$tmp_file_del2
+	rm $tmp_file_del2 $tmp_file_del
 fi
 #Adding records to todolist and destroying temporary files
-cat $tmp_file >> $todolist
-rm $tmp_file $tmp_file_del $tmp_file_del2
+if [ "$do_add" = "yes" ] ; then
+	if [ "$do_deadline" = "yes" ] ; then
+		tmp_dlfile="$HOME/.$$6"
+		touch $tmp_dlfile
+		paste $tmp_file $tmp_dl_file > $tmp_dlfile
+		cat $tmp_dlfile > $tmp_file
+		rm $tmp_dlfile
+	fi
+	paste $tmp_file $tmp_time_stamp >> $todolist
+	rm $tmp_file $tmp_time_stamp
+fi
+
 #Displaying todolist on screen
 if [ $echo_todolist = "yes" ] ; then
+	#magic with colors
+	NC='\033[0m'
+	GREEN='\033[0;32m'
+	echo -e "\t${GREEN}records\t\tday added${NC}"
 	cat -n $todolist
 fi
