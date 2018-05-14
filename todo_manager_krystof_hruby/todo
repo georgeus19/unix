@@ -1,5 +1,6 @@
 #!/bin/bash
 do_help=no
+
 ret_val=0
 records=""
 #todo_pwd=`echo $0 | sed 's=\(.*\)\(todo\)=\1=g'`
