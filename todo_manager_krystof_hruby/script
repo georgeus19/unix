@@ -1,0 +1,9 @@
+#!/bin/bash
+touch $HOME/.todolist
+#(
+#flock 1
+while true  ; do
+echo "ZDAR" >> $HOME/.todolist
+done
+#) < $HOME/.todolist
+

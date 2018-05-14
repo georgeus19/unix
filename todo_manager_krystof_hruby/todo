@@ -9,8 +9,8 @@ records=""
 todolist="$HOME/.todolist"
 do_add="no"
 touch $todolist
-(
-flock 1
+#(
+#flock 1
 tmp_file="$HOME/.$$1"
 tmp_file_del="$HOME/.$$2"
 tmp_file_del2="$HOME/.$$3"
@@ -167,4 +167,4 @@ if [ $echo_todolist = "yes" ] ; then
 	echo -e "\t${GREEN}records\t\tdeadline\tday added${NC}"
 	cat -n $todolist
 fi
-) < $todolist
+#) < $todolist

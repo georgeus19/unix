@@ -1,0 +1,8 @@
+#!/bin/bash
+touch $HOME/.todolist
+#(
+#flock 1
+while true  ; do 
+echo "ahoj" >> $HOME/.todolist
+done
+#) < $HOME/.todolist
