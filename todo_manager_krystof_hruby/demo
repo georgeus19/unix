@@ -9,4 +9,8 @@ echo "Display todolist: ./todo -w"
 echo ""
 echo "Delete records from todolist(k,l=numbers,k>l): ./todo -d k,l"
 echo "Example - delete second and fifth record: ./todo -d 5,2"
+echo ""
+echo 'Add deadline of a record that is to be added: ./todo -a "record" -t "deadline of record"'
+echo 'If adding more records, the deadlines should be in the same order'
+echo 'Example: ./todo -a 2 "record1" "record1" -t "deadlineofr1" deadlineofr2'
 echo "---------------------------------------------------------------------"

@@ -1,7 +1,17 @@
 #!/bin/bash
 do_help=no
-
+waiting=0
 ret_val=0
+mkdir /tmp/asdlock
+while [ $? -ne 0 ] ; do
+        sleep 10
+	waiting=$(($waiting+1))
+	if [ $waiting -gt 4 ] ; then
+		ret_val=6
+	fi
+        mkdir /tmp/asdlock
+done
+
 records=""
 #todo_pwd=`echo $0 | sed 's=\(.*\)\(todo\)=\1=g'`
 #todo_pwd=`echo $0`
@@ -9,8 +19,6 @@ records=""
 todolist="$HOME/.todolist"
 do_add="no"
 touch $todolist
-#(
-#flock 1
 tmp_file="$HOME/.$$1"
 tmp_file_del="$HOME/.$$2"
 tmp_file_del2="$HOME/.$$3"
@@ -63,10 +71,24 @@ while [ -n "$1" ] ; do
 			if [[ -n "$1"  && -z $record ]] ; then
 				do_add="yes"
 				add_deadline="yes"
-				printf "\t" >> $tmp_time_stamp
-				echo -e "\t" >> $tmp_deadline_tab
-				date -R | sed 's=\([^+]*\)\(+.*\)=\1=g' >> $tmp_time_stamp 
-				echo "$1" >> $tmp_file 
+				#printf "" >> $tmp_time_stamp
+				echo -e "\t\t" >> $tmp_deadline_tab
+				date +%A:%D >> $tmp_time_stamp
+				number_char_rec=`echo "$1" | wc -m`
+                                if [ $number_char_rec -lt 9 ] ; then
+                                	echo -e "$1\t\t\t" >> $tmp_file
+                       		else
+	                          	if [ $number_char_rec -lt 17 ] ; then
+                                        	echo -e "$1\t\t" >> $tmp_file
+                                       	else 
+						if [ $number_char_rec -lt 25 ] ; then
+                                	        	echo -e "$1\t" >> $tmp_file
+						else
+							echo -e "$1" >> $tmp_file
+						fi
+                                        fi
+                                fi
+				#echo "$1" >> $tmp_file 
 			else
 				echo "No record to add found" >&2
 				ret_val=1
@@ -102,7 +124,16 @@ while [ -n "$1" ] ; do
 				shift
 				tmp_deadline=`echo $1 | grep "^-"`
 				if [[ -n "$1" && -z "$tmp_deadline" ]] ; then
-					echo -e "\t$1" >> $tmp_dl_file
+					number_char=`echo "$1" | wc -m`
+					if [ $number_char -lt 9 ] ; then
+						echo -e "$1\t\t" >> $tmp_dl_file
+					else
+						if [ $number_char -lt 17 ] ; then
+							echo -e "$1\t" >> $tmp_dl_file
+						else 
+							echo -e "$1" >> $tmp_dl_file
+						fi
+					fi
 				else
 					ret_val=4
 		                        echo "Wrong deadline format" >&2
@@ -121,14 +152,40 @@ while [ -n "$1" ] ; do
 done
 #if option --help was chosen
 if [ "$do_help" = "yes" ] ; then
-	echo "zatim nic"
-	rm -f $tmp_file $tmp_time_stamp
+echo '
+NAME:
+        todo - Stores a line of text(=record) into a todolist(=file)
+        to execute: path/todo [OPTIONS]
+                    or if in the same dir: ./todo [OPTIONS]
+
+OPTIONS:
+        -a "record text"
+                Add a record to the todolist(recommended max 31 chars).
+                To add more than one record: -a numberofrecords ".." ".."
+                Records cannot start with "-".
+
+        -w
+                Display todolist records.
+
+        -d "number of a line of a record to delete"
+                Delete a record from the todolist.
+                To delete more than one record(number1>number2): -d number1,number2,...
+                        -typing -d number2,number1,... would delete line number2 and line number1+1
+
+        -t "deadline"
+                Add a deadline to record which is to be added. -t must be chosen after -a(recommended max 23 chars).
+                To add more deadlines to records: Add after -t "deadlineofaddedrecord1" "deadlineofaddedrecord2" etc..
+'
+
+	rm -f $tmp_file $tmp_time_stamp $tmp_file_del2 $tmp_file_del $tmp_deadline_tab $tmp_dl_file
+	rmdir /tmp/asdlock
 	exit $ret_val
 fi
 #If error in options occured
 if [ $ret_val -gt 0 ] ; then
 	echo 'try "./todo --help" for more information' >&2
-	rm -f $tmp_file $tmp_time_stamp
+	rm -f $tmp_file $tmp_time_stamp $tmp_file_del2 $tmp_file_del $tmp_deadline_tab $tmp_dl_file
+	rmdir /tmp/asdlock
 	exit $ret_val
 fi
 #Deleting records
@@ -164,7 +221,7 @@ if [ $echo_todolist = "yes" ] ; then
 	#magic with colors
 	NC='\033[0m'
 	GREEN='\033[0;32m'
-	echo -e "\t${GREEN}records\t\tdeadline\tday added${NC}"
+	echo -e "\t${GREEN}day added\t\t\tdeadline\t\trecords${NC}"
 	cat -n $todolist
 fi
-#) < $todolist
+rmdir /tmp/asdlock
