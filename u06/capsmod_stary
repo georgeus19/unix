@@ -1,0 +1,37 @@
+#!/bin/sh
+prejmenujMV () {
+ls -R $1 | grep "[A-Z]*" | grep -v "[a-z]" | tr 'a-z' 'A-Z' ; }
+
+
+
+find $1 -type f | grep "[A-Z]*" | grep -v "[a-z]" | while read f ; do
+prohozeny=`xargs tr 'A-Z' 'a-z' f`
+mv f $prohozeny
+echo $prohozeny
+done
+
+
+
+prejmenujVM () { ls -R $1 | grep "[A-Z]*" | grep -v "[a-z]" | tr 'A-Z' 'a-z' ; }
+if [ $1 = '-r' ] ; then
+		a=2
+		shift
+	else 
+		a=1 
+		fi ;
+if [ $1 = '.*' ] ; then
+	while [ $1 = '*' ] ;  do
+	if [ $a -eq 1 ] ; then
+		prejmenujVM $1
+	else
+		prejmenujMV $1
+		fi ;
+	shift
+	done 
+else
+if [ $a -eq 1 ] ; then
+        prejmenujVM .
+else
+        prejmenujMV .
+        fi ;
+fi ;

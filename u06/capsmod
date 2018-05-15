@@ -1,0 +1,24 @@
+#!/bin/sh
+i=0
+find $1 -type f | grep "[A-Z]*" | while read soubor ; do
+echo $soubor
+echo $soubor | grep -o "/[^ /]*$" | tr -d '/' > jmenos 
+declare -i pocetznakucelkem=0
+pocetznakucelkem=`cat jmenos | wc -m`
+cat $jmenos
+declare -i pocetcaps=0
+pocetcaps=`cat jmenos | grep -o "[A-Z]*" | wc -m`
+echo $pocetznakucelkem
+echo $pocetcaps
+if [ $pocetznakucelkem -eq $pocetcaps ] ; then
+novynazev=`cat jmenos | grep -o "[A-Z]*" | tr 'A-Z' 'a-z'`
+echo $novynazev
+a=`echo $soubor | grep -v "/[^ /]*$"`
+konecnynazev="$a/$novynazev"
+echo $a
+mv $soubor $konecnynazev
+echo $konecnynazev
+fi ;
+
+done
+#$# pro pocet argumentu

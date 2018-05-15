@@ -1,0 +1,5 @@
+find . -name "[A-Z]*" -type f -exec mv <(`grep -v "[a-z]" {} `) <(`grep -v "[a-z]" {}  | tr 'A-Z' 'a-z'`) \;
+rename () { mv $1 `tr 'A-Z' 'a-z' $1` ; }
+~
+find . -name "[A-Z]*" -type f -exec mv <(`grep -v "[a-z]" {} `) <(`grep -v "[a-z]" {}  | tr 'A-Z' 'a-z'`) \;
+rename () { mv $1 `tr 'A-Z' 'a-z' $1` ; }
