@@ -1,0 +1,45 @@
+V:\CSharp\Skupina A1 - CV3\CSHra_vychozi_stav\bin\Debug\ikonky.png
+V:\CSharp\Skupina A1 - CV3\CSHra_vychozi_stav\bin\Debug\mapa.txt
+V:\CSharp\Skupina A1 - CV3\CSHra_vychozi_stav\bin\Debug\CSHra.exe.config
+V:\CSharp\Skupina A1 - CV3\CSHra_vychozi_stav\bin\Debug\CSHra.exe
+V:\CSharp\Skupina A1 - CV3\CSHra_vychozi_stav\bin\Debug\CSHra.pdb
+V:\CSharp\Skupina A1 - CV3\CSHra_vychozi_stav\obj\Debug\CSHra.csprojResolveAssemblyReference.cache
+V:\CSharp\Skupina A1 - CV3\CSHra_vychozi_stav\obj\Debug\CSHra.Form1.resources
+V:\CSharp\Skupina A1 - CV3\CSHra_vychozi_stav\obj\Debug\CSHra.Properties.Resources.resources
+V:\CSharp\Skupina A1 - CV3\CSHra_vychozi_stav\obj\Debug\CSHra.csproj.GenerateResource.Cache
+V:\CSharp\Skupina A1 - CV3\CSHra_vychozi_stav\obj\Debug\CSHra.exe
+V:\CSharp\Skupina A1 - CV3\CSHra_vychozi_stav\obj\Debug\CSHra.pdb
+D:\2017-18\OOP\cshra\CSHra_vychozi_stav\bin\Debug\CSHra.exe.config
+D:\2017-18\OOP\cshra\CSHra_vychozi_stav\obj\Debug\CSHra.exe
+D:\2017-18\OOP\cshra\CSHra_vychozi_stav\obj\Debug\CSHra.pdb
+D:\2017-18\OOP\cshra\CSHra_vychozi_stav\bin\Debug\ikonky.png
+D:\2017-18\OOP\cshra\CSHra_vychozi_stav\bin\Debug\CSHra.exe
+D:\2017-18\OOP\cshra\CSHra_vychozi_stav\bin\Debug\CSHra.pdb
+D:\2017-18\OOP\cshra\CSHra_vychozi_stav\obj\Debug\CSHra.csprojResolveAssemblyReference.cache
+D:\2017-18\OOP\cshra\CSHra_vychozi_stav\obj\Debug\CSHra.Form1.resources
+D:\2017-18\OOP\cshra\CSHra_vychozi_stav\obj\Debug\CSHra.Properties.Resources.resources
+D:\2017-18\OOP\cshra\CSHra_vychozi_stav\obj\Debug\CSHra.csproj.GenerateResource.Cache
+D:\2017-18\OOP\cshra\CSHra_vychozi_stav\bin\Debug\plan.txt
+D:\2017-18\SemPgm\cshra\CSHra_vychozi_stav\bin\Debug\ikonky.png
+D:\2017-18\SemPgm\cshra\CSHra_vychozi_stav\bin\Debug\plan.txt
+D:\2017-18\SemPgm\cshra\CSHra_vychozi_stav\bin\Debug\CSHra.exe.config
+D:\2017-18\SemPgm\cshra\CSHra_vychozi_stav\bin\Debug\CSHra.exe
+D:\2017-18\SemPgm\cshra\CSHra_vychozi_stav\bin\Debug\CSHra.pdb
+D:\2017-18\SemPgm\cshra\CSHra_vychozi_stav\obj\Debug\CSHra.csprojResolveAssemblyReference.cache
+D:\2017-18\SemPgm\cshra\CSHra_vychozi_stav\obj\Debug\CSHra.Form1.resources
+D:\2017-18\SemPgm\cshra\CSHra_vychozi_stav\obj\Debug\CSHra.Properties.Resources.resources
+D:\2017-18\SemPgm\cshra\CSHra_vychozi_stav\obj\Debug\CSHra.csproj.GenerateResource.Cache
+D:\2017-18\SemPgm\cshra\CSHra_vychozi_stav\obj\Debug\CSHra.csproj.CoreCompileInputs.cache
+D:\2017-18\SemPgm\cshra\CSHra_vychozi_stav\obj\Debug\CSHra.exe
+D:\2017-18\SemPgm\cshra\CSHra_vychozi_stav\obj\Debug\CSHra.pdb
+D:\temp\cshra\CSHra_vychozi_stav\bin\Debug\CSHra.exe.config
+D:\temp\cshra\CSHra_vychozi_stav\obj\Debug\CSHra.exe
+D:\temp\cshra\CSHra_vychozi_stav\obj\Debug\CSHra.pdb
+D:\temp\cshra\CSHra_vychozi_stav\bin\Debug\ikonky.png
+D:\temp\cshra\CSHra_vychozi_stav\bin\Debug\plan.txt
+D:\temp\cshra\CSHra_vychozi_stav\bin\Debug\CSHra.exe
+D:\temp\cshra\CSHra_vychozi_stav\bin\Debug\CSHra.pdb
+D:\temp\cshra\CSHra_vychozi_stav\obj\Debug\CSHra.csprojResolveAssemblyReference.cache
+D:\temp\cshra\CSHra_vychozi_stav\obj\Debug\CSHra.Form1.resources
+D:\temp\cshra\CSHra_vychozi_stav\obj\Debug\CSHra.Properties.Resources.resources
+D:\temp\cshra\CSHra_vychozi_stav\obj\Debug\CSHra.csproj.GenerateResource.Cache
