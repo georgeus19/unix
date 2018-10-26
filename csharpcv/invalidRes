@@ -1,0 +1,12 @@
+writer.WriteLine("");
+writer.WriteLine("<!DOCTYPE html>");
+writer.WriteLine("<html lang=\"en\" xmlns=\"http://www.w3.org/1999/xhtml\">");
+writer.WriteLine("<head>");
+writer.WriteLine("	<meta charset=\"utf-8\" />");
+writer.WriteLine("	<title>Nezarka.net: Online Shopping for Books</title>");
+writer.WriteLine("</head>");
+writer.WriteLine("<body>");
+writer.WriteLine("<p>Invalid request.</p>");
+writer.WriteLine("</body>");
+writer.WriteLine("</html>");
+writer.WriteLine("");
