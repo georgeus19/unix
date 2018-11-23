@@ -2,10 +2,8 @@
 #ifndef ARRAY
 #define ARRAY
 
-
-
 ///
-///Array is dynamic array container
+///Array is a dynamic array container
 ///Any out of range indexing causes undefined behaviour
 ///Poping nonexistent member causes undefined behaviour
 ///
@@ -42,8 +40,7 @@ private:
 													 
 		for (size_t i = 0; i < numberOfElements; ++i)
 		{
-			T val = tmp[i];
-			new (pointer + i) T(val);
+			new (pointer + i) T(tmp[i]);
 		}
 		for (size_t i = numberOfElements; i < length; ++i)
 		{
@@ -404,3 +401,4 @@ public:
 };
 
 #endif
+
