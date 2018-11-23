@@ -20,7 +20,7 @@ private:
 		pointer = (T*)operator new (sizeof(T)*(other.numberOfElements));
 		for (size_t i = 0; i< other.numberOfElements; ++i)
 		{
-			this->push_back(other[i]);
+			push_back(other[i]);
 		}
 	}
 
